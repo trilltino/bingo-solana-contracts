@@ -37,6 +37,7 @@ Thumbs.db
 
 # Reference repos (don't commit these)
 ref/
+bingo/bingo/
 
 # Build artifacts
 *.so
