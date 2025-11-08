@@ -1,0 +1,3025 @@
+{
+  "address": "8W83G9mSeoQ6Ljcz5QJHYPjH2vQgw94YeVCnpY6KFt7i",
+  "metadata": {
+    "name": "bingo",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Solana bingo platform with quiz rooms and prize distribution"
+  },
+  "docs": [
+    "Fundraisely Program",
+    "",
+    "All instruction handlers are implemented in the instructions module.",
+    "This keeps lib.rs clean and follows Anchor's recommended project structure."
+  ],
+  "instructions": [
+    {
+      "name": "add_approved_token",
+      "docs": [
+        "Add a token to the approved list"
+      ],
+      "discriminator": [
+        243,
+        15,
+        9,
+        190,
+        211,
+        61,
+        218,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "token_registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  45,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121,
+                  45,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "token_mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "add_prize_asset",
+      "docs": [
+        "Add prize asset to asset-based room"
+      ],
+      "discriminator": [
+        73,
+        174,
+        200,
+        110,
+        91,
+        241,
+        141,
+        104
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "room.host",
+                "account": "Room"
+              },
+              {
+                "kind": "arg",
+                "path": "room_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "prize_vault",
+          "docs": [
+            "Prize vault PDA - will be created manually in handler (like room_vault)",
+            "Using UncheckedAccount to skip Anchor's initialization validation",
+            "The handler will derive the PDA manually and validate it"
+          ],
+          "writable": true
+        },
+        {
+          "name": "host_token_account",
+          "writable": true
+        },
+        {
+          "name": "host",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "prize_mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "room_id",
+          "type": "string"
+        },
+        {
+          "name": "prize_index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "cleanup_room",
+      "docs": [
+        "Cleanup room and reclaim rent (host or admin)"
+      ],
+      "discriminator": [
+        68,
+        85,
+        10,
+        56,
+        80,
+        219,
+        249,
+        43
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "room.host",
+                "account": "Room"
+              },
+              {
+                "kind": "arg",
+                "path": "room_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "room_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "room"
+              }
+            ]
+          }
+        },
+        {
+          "name": "global_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "caller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "room_id",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "close_joining",
+      "docs": [
+        "Close joining for a room (host only)"
+      ],
+      "discriminator": [
+        203,
+        245,
+        231,
+        125,
+        106,
+        208,
+        104,
+        176
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "room.host",
+                "account": "Room"
+              },
+              {
+                "kind": "arg",
+                "path": "room_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "host",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "room_id",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "declare_winners",
+      "docs": [
+        "Declare winners for a room (must be called before end_room)"
+      ],
+      "discriminator": [
+        42,
+        228,
+        213,
+        39,
+        88,
+        35,
+        143,
+        71
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "room.host",
+                "account": "Room"
+              },
+              {
+                "kind": "arg",
+                "path": "room_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "host",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "room_id",
+          "type": "string"
+        },
+        {
+          "name": "winners",
+          "type": {
+            "vec": "pubkey"
+          }
+        }
+      ]
+    },
+    {
+      "name": "end_room",
+      "docs": [
+        "End room and distribute prizes to winners"
+      ],
+      "discriminator": [
+        102,
+        106,
+        181,
+        155,
+        61,
+        17,
+        40,
+        78
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "host"
+              },
+              {
+                "kind": "arg",
+                "path": "room_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "room_vault",
+          "writable": true
+        },
+        {
+          "name": "global_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "platform_token_account",
+          "writable": true
+        },
+        {
+          "name": "charity_token_account",
+          "writable": true
+        },
+        {
+          "name": "host_token_account",
+          "writable": true
+        },
+        {
+          "name": "host",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "room_id",
+          "type": "string"
+        },
+        {
+          "name": "winners",
+          "type": {
+            "vec": "pubkey"
+          }
+        }
+      ]
+    },
+    {
+      "name": "init_asset_room",
+      "docs": [
+        "Initialize asset-based room"
+      ],
+      "discriminator": [
+        130,
+        35,
+        252,
+        232,
+        247,
+        146,
+        31,
+        171
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "host"
+              },
+              {
+                "kind": "arg",
+                "path": "room_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "room_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "room"
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_token_mint"
+        },
+        {
+          "name": "token_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  45,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121,
+                  45,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "global_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "host",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "room_id",
+          "type": "string"
+        },
+        {
+          "name": "charity_wallet",
+          "type": "pubkey"
+        },
+        {
+          "name": "entry_fee",
+          "type": "u64"
+        },
+        {
+          "name": "max_players",
+          "type": "u32"
+        },
+        {
+          "name": "host_fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "charity_memo",
+          "type": "string"
+        },
+        {
+          "name": "expiration_slots",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "prize_1_mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "prize_1_amount",
+          "type": "u64"
+        },
+        {
+          "name": "prize_2_mint",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "prize_2_amount",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "prize_3_mint",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "prize_3_amount",
+          "type": {
+            "option": "u64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "init_pool_room",
+      "docs": [
+        "Create a pool-based room where prizes come from entry fee pool"
+      ],
+      "discriminator": [
+        51,
+        17,
+        194,
+        102,
+        72,
+        127,
+        188,
+        37
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "host"
+              },
+              {
+                "kind": "arg",
+                "path": "room_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "room_vault",
+          "docs": [
+            "SECURITY: Handler validates this is a proper TokenAccount with correct mint/authority.",
+            "Using AccountInfo to avoid initialization order issues (room must exist before vault can use it as authority).",
+            "The handler performs manual deserialization and validation of TokenAccount structure."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "room"
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_token_mint"
+        },
+        {
+          "name": "token_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  45,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121,
+                  45,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "global_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "host",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "room_id",
+          "type": "string"
+        },
+        {
+          "name": "charity_wallet",
+          "type": "pubkey"
+        },
+        {
+          "name": "entry_fee",
+          "type": "u64"
+        },
+        {
+          "name": "max_players",
+          "type": "u32"
+        },
+        {
+          "name": "host_fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "prize_pool_bps",
+          "type": "u16"
+        },
+        {
+          "name": "first_place_pct",
+          "type": "u16"
+        },
+        {
+          "name": "second_place_pct",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "third_place_pct",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "charity_memo",
+          "type": "string"
+        },
+        {
+          "name": "expiration_slots",
+          "type": {
+            "option": "u64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "Initialize the global configuration (one-time setup)"
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "global_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "platform_wallet",
+          "type": "pubkey"
+        },
+        {
+          "name": "charity_wallet",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "initialize_token_registry",
+      "docs": [
+        "Initialize the token registry (one-time setup)"
+      ],
+      "discriminator": [
+        206,
+        94,
+        91,
+        162,
+        242,
+        92,
+        51,
+        192
+      ],
+      "accounts": [
+        {
+          "name": "token_registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  45,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121,
+                  45,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "join_room",
+      "docs": [
+        "Join a room by paying entry fee"
+      ],
+      "discriminator": [
+        95,
+        232,
+        188,
+        81,
+        124,
+        130,
+        78,
+        139
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "room.host",
+                "account": "Room"
+              },
+              {
+                "kind": "arg",
+                "path": "room_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player_entry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "room"
+              },
+              {
+                "kind": "account",
+                "path": "player"
+              }
+            ]
+          }
+        },
+        {
+          "name": "room_vault",
+          "docs": [
+            "Room vault token account - receives player's entry fee tokens.",
+            "SECURITY: Properly typed as TokenAccount to ensure correct account validation."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "room"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player_token_account",
+          "writable": true
+        },
+        {
+          "name": "global_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "room_id",
+          "type": "string"
+        },
+        {
+          "name": "extras_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "recover_room",
+      "docs": [
+        "Recover abandoned room (admin only)"
+      ],
+      "discriminator": [
+        23,
+        246,
+        194,
+        40,
+        13,
+        163,
+        9,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "room.host",
+                "account": "Room"
+              },
+              {
+                "kind": "arg",
+                "path": "room_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "room_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "room"
+              }
+            ]
+          }
+        },
+        {
+          "name": "global_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "platform_token_account",
+          "writable": true
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "room_id",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "remove_approved_token",
+      "docs": [
+        "Remove a token from the approved list"
+      ],
+      "discriminator": [
+        210,
+        154,
+        53,
+        36,
+        34,
+        32,
+        178,
+        5
+      ],
+      "accounts": [
+        {
+          "name": "token_registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  45,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121,
+                  45,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "token_mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_emergency_pause",
+      "docs": [
+        "Set emergency pause (admin only)"
+      ],
+      "discriminator": [
+        216,
+        204,
+        65,
+        234,
+        19,
+        243,
+        233,
+        25
+      ],
+      "accounts": [
+        {
+          "name": "global_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "paused",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "update_global_config",
+      "docs": [
+        "Update global configuration (admin only)"
+      ],
+      "discriminator": [
+        164,
+        84,
+        130,
+        189,
+        111,
+        58,
+        250,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "global_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "global_config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "platform_wallet",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "charity_wallet",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "platform_fee_bps",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "max_host_fee_bps",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "max_prize_pool_bps",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "min_charity_bps",
+          "type": {
+            "option": "u16"
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "GlobalConfig",
+      "discriminator": [
+        149,
+        8,
+        156,
+        202,
+        160,
+        252,
+        176,
+        217
+      ]
+    },
+    {
+      "name": "PlayerEntry",
+      "discriminator": [
+        158,
+        6,
+        39,
+        104,
+        234,
+        4,
+        153,
+        255
+      ]
+    },
+    {
+      "name": "Room",
+      "discriminator": [
+        156,
+        199,
+        67,
+        27,
+        222,
+        23,
+        185,
+        94
+      ]
+    },
+    {
+      "name": "TokenRegistry",
+      "discriminator": [
+        227,
+        255,
+        152,
+        118,
+        84,
+        200,
+        145,
+        120
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AssetRoomCreated",
+      "discriminator": [
+        43,
+        19,
+        40,
+        163,
+        136,
+        156,
+        39,
+        140
+      ]
+    },
+    {
+      "name": "EmergencyPauseToggled",
+      "discriminator": [
+        68,
+        107,
+        204,
+        70,
+        158,
+        210,
+        37,
+        175
+      ]
+    },
+    {
+      "name": "JoiningClosed",
+      "discriminator": [
+        3,
+        1,
+        8,
+        68,
+        238,
+        16,
+        10,
+        16
+      ]
+    },
+    {
+      "name": "PlayerJoined",
+      "discriminator": [
+        39,
+        144,
+        49,
+        106,
+        108,
+        210,
+        183,
+        38
+      ]
+    },
+    {
+      "name": "PrizeAssetDeposited",
+      "discriminator": [
+        114,
+        241,
+        219,
+        111,
+        62,
+        136,
+        228,
+        202
+      ]
+    },
+    {
+      "name": "PrizeAssetWithdrawn",
+      "discriminator": [
+        226,
+        167,
+        144,
+        11,
+        181,
+        109,
+        17,
+        28
+      ]
+    },
+    {
+      "name": "RoomCleaned",
+      "discriminator": [
+        8,
+        165,
+        129,
+        208,
+        157,
+        53,
+        91,
+        28
+      ]
+    },
+    {
+      "name": "RoomCreated",
+      "discriminator": [
+        9,
+        177,
+        128,
+        166,
+        26,
+        19,
+        14,
+        243
+      ]
+    },
+    {
+      "name": "RoomEnded",
+      "discriminator": [
+        204,
+        239,
+        146,
+        218,
+        190,
+        21,
+        193,
+        184
+      ]
+    },
+    {
+      "name": "RoomRecovered",
+      "discriminator": [
+        21,
+        92,
+        162,
+        189,
+        12,
+        245,
+        103,
+        171
+      ]
+    },
+    {
+      "name": "TokenApproved",
+      "discriminator": [
+        160,
+        161,
+        41,
+        109,
+        11,
+        25,
+        143,
+        153
+      ]
+    },
+    {
+      "name": "TokenRemoved",
+      "discriminator": [
+        94,
+        118,
+        141,
+        122,
+        52,
+        69,
+        100,
+        239
+      ]
+    },
+    {
+      "name": "WinnersDeclared",
+      "discriminator": [
+        60,
+        25,
+        114,
+        88,
+        126,
+        49,
+        88,
+        136
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Unauthorized access"
+    },
+    {
+      "code": 6001,
+      "name": "RoomAlreadyExists",
+      "msg": "Room already exists"
+    },
+    {
+      "code": 6002,
+      "name": "RoomNotFound",
+      "msg": "Room not found"
+    },
+    {
+      "code": 6003,
+      "name": "RoomNotReady",
+      "msg": "Room not ready for players"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidRoomStatus",
+      "msg": "Invalid room status"
+    },
+    {
+      "code": 6005,
+      "name": "RoomAlreadyEnded",
+      "msg": "Room already ended"
+    },
+    {
+      "code": 6006,
+      "name": "RoomExpired",
+      "msg": "Room has expired"
+    },
+    {
+      "code": 6007,
+      "name": "PlayerAlreadyJoined",
+      "msg": "Player already joined"
+    },
+    {
+      "code": 6008,
+      "name": "HostCannotBeWinner",
+      "msg": "Host cannot be a winner"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidWinners",
+      "msg": "Invalid winners list"
+    },
+    {
+      "code": 6010,
+      "name": "TokenNotApproved",
+      "msg": "Token not approved"
+    },
+    {
+      "code": 6011,
+      "name": "TokenAlreadyApproved",
+      "msg": "Token is already in the approved registry"
+    },
+    {
+      "code": 6012,
+      "name": "TokenRegistryFull",
+      "msg": "Token registry is full (max 50 tokens)"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidEntryFee",
+      "msg": "Invalid entry fee"
+    },
+    {
+      "code": 6014,
+      "name": "HostFeeTooHigh",
+      "msg": "Host fee exceeds maximum (5%)"
+    },
+    {
+      "code": 6015,
+      "name": "PrizePoolTooHigh",
+      "msg": "Prize pool exceeds maximum (35%)"
+    },
+    {
+      "code": 6016,
+      "name": "CharityBelowMinimum",
+      "msg": "Charity allocation below minimum (40%)"
+    },
+    {
+      "code": 6017,
+      "name": "TotalAllocationTooHigh",
+      "msg": "Total allocation exceeds maximum"
+    },
+    {
+      "code": 6018,
+      "name": "InvalidPrizeDistribution",
+      "msg": "Prize distribution must sum to 100"
+    },
+    {
+      "code": 6019,
+      "name": "InsufficientBalance",
+      "msg": "Insufficient balance"
+    },
+    {
+      "code": 6020,
+      "name": "EmergencyPause",
+      "msg": "Contract is paused"
+    },
+    {
+      "code": 6021,
+      "name": "ArithmeticOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6022,
+      "name": "ArithmeticUnderflow",
+      "msg": "Arithmetic underflow"
+    },
+    {
+      "code": 6023,
+      "name": "InvalidRoomId",
+      "msg": "Invalid room ID (max 32 characters)"
+    },
+    {
+      "code": 6024,
+      "name": "InvalidMemo",
+      "msg": "Invalid memo (max 28 characters)"
+    },
+    {
+      "code": 6025,
+      "name": "MaxPlayersReached",
+      "msg": "Room has reached maximum players"
+    },
+    {
+      "code": 6026,
+      "name": "InvalidMaxPlayers",
+      "msg": "Invalid max_players (must be between 1 and 1000)"
+    },
+    {
+      "code": 6027,
+      "name": "InvalidTokenMint",
+      "msg": "Token account mint does not match room token mint"
+    },
+    {
+      "code": 6028,
+      "name": "InvalidTokenOwner",
+      "msg": "Token account owner does not match expected winner"
+    },
+    {
+      "code": 6029,
+      "name": "WinnersAlreadyDeclared",
+      "msg": "Winners have already been declared for this room"
+    },
+    {
+      "code": 6030,
+      "name": "InvalidPrizeAmount",
+      "msg": "Invalid prize amount (must be > 0)"
+    },
+    {
+      "code": 6031,
+      "name": "PrizeAlreadyDeposited",
+      "msg": "Prize already deposited"
+    },
+    {
+      "code": 6032,
+      "name": "PrizeNotDeposited",
+      "msg": "Prize not deposited yet"
+    },
+    {
+      "code": 6033,
+      "name": "PrizesNotFullyFunded",
+      "msg": "All prizes must be deposited before players can join"
+    },
+    {
+      "code": 6034,
+      "name": "RoomNotAbandoned",
+      "msg": "Room cannot be recovered yet (not abandoned)"
+    },
+    {
+      "code": 6035,
+      "name": "InvalidPlayerEntry",
+      "msg": "Invalid player entry (winner did not join the room)"
+    },
+    {
+      "code": 6036,
+      "name": "InvalidVaultAccount",
+      "msg": "Invalid vault account (must be a valid TokenAccount)"
+    },
+    {
+      "code": 6037,
+      "name": "InvalidVaultAuthority",
+      "msg": "Invalid vault authority (vault must be owned by room PDA)"
+    },
+    {
+      "code": 6038,
+      "name": "JoiningClosed",
+      "msg": "Room is no longer accepting new players"
+    },
+    {
+      "code": 6039,
+      "name": "VaultNotEmpty",
+      "msg": "Vault must be empty before cleanup"
+    },
+    {
+      "code": 6040,
+      "name": "InsufficientAuthority",
+      "msg": "Insufficient authority for this operation"
+    }
+  ],
+  "types": [
+    {
+      "name": "AssetRoomCreated",
+      "docs": [
+        "Emitted when a new asset-based room is created",
+        "",
+        "Asset rooms use pre-deposited prizes instead of pool splitting."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "docs": [
+              "PDA address of the created asset room"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "room_id",
+            "docs": [
+              "Human-readable room identifier"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "host",
+            "docs": [
+              "Host's wallet address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "entry_fee",
+            "docs": [
+              "Entry fee amount"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "expected_prizes",
+            "docs": [
+              "Number of expected prizes"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp of creation"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EmergencyPauseToggled",
+      "docs": [
+        "Emitted when emergency pause is toggled by admin"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "paused",
+            "docs": [
+              "New pause state"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "admin",
+            "docs": [
+              "Admin who toggled the pause"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "slot",
+            "docs": [
+              "Slot when toggle occurred"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GlobalConfig",
+      "docs": [
+        "Platform-wide configuration and economic parameters",
+        "",
+        "This singleton PDA defines the economic constraints and wallet routing",
+        "for all fundraising rooms. Created once during program initialization."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "docs": [
+              "Admin public key (can update config)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_wallet",
+            "docs": [
+              "Platform wallet (receives platform fees)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "charity_wallet",
+            "docs": [
+              "Charity wallet (receives charity donations)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_fee_bps",
+            "docs": [
+              "Platform fee in basis points (2000 = 20%)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_host_fee_bps",
+            "docs": [
+              "Maximum host fee in basis points (500 = 5%)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_prize_pool_bps",
+            "docs": [
+              "Maximum prize pool in basis points (3500 = 35%)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "min_charity_bps",
+            "docs": [
+              "Minimum charity allocation in basis points (4000 = 40%)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "emergency_pause",
+            "docs": [
+              "Emergency pause flag"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JoiningClosed",
+      "docs": [
+        "Emitted when host closes joining for a room"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "docs": [
+              "Room PDA that was closed"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "room_id",
+            "docs": [
+              "Room identifier"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "host",
+            "docs": [
+              "Host who closed joining"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "player_count",
+            "docs": [
+              "Current player count when closed"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlayerEntry",
+      "docs": [
+        "Individual player participation record",
+        "",
+        "Immutable receipt of a player joining a specific room, tracking exact",
+        "payment amounts and timing. One per player per room."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "player",
+            "docs": [
+              "Player's public key"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "room",
+            "docs": [
+              "Room public key"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "entry_paid",
+            "docs": [
+              "Entry fee paid"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "extras_paid",
+            "docs": [
+              "Extra amount paid"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_paid",
+            "docs": [
+              "Total amount paid (entry + extras)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "join_slot",
+            "docs": [
+              "Slot when player joined"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlayerJoined",
+      "docs": [
+        "Emitted when a player joins a room",
+        "",
+        "Enables real-time player count updates and participation tracking."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "docs": [
+              "Room PDA that was joined"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "player",
+            "docs": [
+              "Player's wallet address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_paid",
+            "docs": [
+              "Total amount paid (entry fee + extras)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "extras_paid",
+            "docs": [
+              "Voluntary extra donation amount"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "player_count",
+            "docs": [
+              "Current number of players in room after this join"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp of join"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PrizeAsset",
+      "docs": [
+        "Asset prize information for asset-based rooms"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "docs": [
+              "Token mint for this prize"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Amount of tokens for this prize"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "deposited",
+            "docs": [
+              "Whether this prize has been deposited/escrowed"
+            ],
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PrizeAssetDeposited",
+      "docs": [
+        "Emitted when a prize asset is deposited into an asset-based room",
+        "",
+        "Tracks deposit of pre-determined prizes for asset mode."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "docs": [
+              "Room PDA receiving the prize asset"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "prize_index",
+            "docs": [
+              "Index of the prize (0 = 1st place, 1 = 2nd place, etc.)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address of the deposited asset"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Amount of tokens deposited"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "depositor",
+            "docs": [
+              "Depositor's wallet address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp of deposit"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PrizeAssetWithdrawn",
+      "docs": [
+        "Emitted when a prize asset is withdrawn (undeposited) from an asset-based room",
+        "",
+        "Only host can withdraw before room starts."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "docs": [
+              "Room PDA from which asset was withdrawn"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "prize_index",
+            "docs": [
+              "Index of the prize that was withdrawn"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address of withdrawn asset"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Amount of tokens withdrawn"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "recipient",
+            "docs": [
+              "Recipient wallet (usually host)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp of withdrawal"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PrizeMode",
+      "docs": [
+        "Prize distribution mode"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "PoolSplit"
+          },
+          {
+            "name": "AssetBased"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Room",
+      "docs": [
+        "Individual game room state and configuration",
+        "",
+        "Tracks all financial and state information for a single fundraising game.",
+        "Created by hosts via init_pool_room, becomes immutable after ending."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room_id",
+            "docs": [
+              "Unique room identifier (max 32 bytes)"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "host",
+            "docs": [
+              "Host's public key"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "charity_wallet",
+            "docs": [
+              "Charity wallet address (per-room, from The Giving Block or custom)",
+              "Receives the charity portion of total pool (entry fees + extras, split proportionally)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_token_mint",
+            "docs": [
+              "Token mint for entry fees"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "entry_fee",
+            "docs": [
+              "Entry fee amount in token base units"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "host_fee_bps",
+            "docs": [
+              "Host fee in basis points (0-500 = 0-5%)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "prize_pool_bps",
+            "docs": [
+              "Prize pool in basis points (0-4000 = 0-40%)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "charity_bps",
+            "docs": [
+              "Charity percentage in basis points (calculated)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "prize_mode",
+            "docs": [
+              "Prize distribution mode"
+            ],
+            "type": {
+              "defined": {
+                "name": "PrizeMode"
+              }
+            }
+          },
+          {
+            "name": "prize_distribution",
+            "docs": [
+              "Prize distribution percentages [1st, 2nd, 3rd]"
+            ],
+            "type": {
+              "vec": "u16"
+            }
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Room status"
+            ],
+            "type": {
+              "defined": {
+                "name": "RoomStatus"
+              }
+            }
+          },
+          {
+            "name": "player_count",
+            "docs": [
+              "Number of players joined"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "max_players",
+            "docs": [
+              "Maximum number of players allowed"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "total_collected",
+            "docs": [
+              "Total amount collected from all players"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_entry_fees",
+            "docs": [
+              "Total from entry fees only"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_extras_fees",
+            "docs": [
+              "Total from extras payments"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "joining_closed",
+            "docs": [
+              "Whether new players can join (host can close joining early)"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "ended",
+            "docs": [
+              "Game ended flag"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "creation_slot",
+            "docs": [
+              "Slot when room was created"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "expiration_slot",
+            "docs": [
+              "Slot when room expires (0 = no expiration)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "charity_memo",
+            "docs": [
+              "Charity memo for transfers"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "winners",
+            "docs": [
+              "Declared winners (1-10, set by declare_winners instruction)"
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "prize_assets",
+            "docs": [
+              "Prize assets for asset-based rooms (None for pool-based rooms)",
+              "[1st place, 2nd place, 3rd place]"
+            ],
+            "type": {
+              "array": [
+                {
+                  "option": {
+                    "defined": {
+                      "name": "PrizeAsset"
+                    }
+                  }
+                },
+                3
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoomCleaned",
+      "docs": [
+        "Emitted when a room is cleaned up and vaults closed"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "docs": [
+              "Room PDA that was cleaned"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "room_id",
+            "docs": [
+              "Room identifier"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "rent_reclaimed",
+            "docs": [
+              "Rent lamports reclaimed from vault closure"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "recipient",
+            "docs": [
+              "Recipient of reclaimed rent"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoomCreated",
+      "docs": [
+        "Emitted when a new fundraising room is created",
+        "",
+        "Allows frontends to display new rooms immediately and indexers to track all rooms."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "docs": [
+              "PDA address of the created room"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "room_id",
+            "docs": [
+              "Human-readable room identifier (max 32 chars)"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "host",
+            "docs": [
+              "Host's wallet address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "entry_fee",
+            "docs": [
+              "Entry fee amount in token's base units"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_players",
+            "docs": [
+              "Maximum number of players allowed"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "expiration_slot",
+            "docs": [
+              "Slot number when room expires (0 = no expiration)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp of room creation"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoomEnded",
+      "docs": [
+        "Emitted when a room ends and funds are distributed",
+        "",
+        "Critical for verifying transparent fund distribution and charitable impact."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "docs": [
+              "Room PDA that ended"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "winners",
+            "docs": [
+              "List of winner wallet addresses (1-3 winners)"
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "platform_amount",
+            "docs": [
+              "Amount sent to platform wallet"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "host_amount",
+            "docs": [
+              "Amount sent to host wallet"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "charity_amount",
+            "docs": [
+              "Amount sent to charity (calculated from total pool proportionally, including extras)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "prize_amount",
+            "docs": [
+              "Total prize pool distributed to winners"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_players",
+            "docs": [
+              "Total number of players who participated"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp of room end"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoomRecovered",
+      "docs": [
+        "Emitted when a room is recovered by admin",
+        "",
+        "Emergency recovery for stuck funds or abandoned rooms."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "docs": [
+              "Room PDA that was recovered"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_recovered",
+            "docs": [
+              "Amount recovered from vault"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "recipient",
+            "docs": [
+              "Recipient of recovered funds"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "docs": [
+              "Admin who performed recovery"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp of recovery"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoomStatus",
+      "docs": [
+        "Room lifecycle state"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "AwaitingFunding"
+          },
+          {
+            "name": "PartiallyFunded"
+          },
+          {
+            "name": "Ready"
+          },
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Ended"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenApproved",
+      "docs": [
+        "Emitted when a token is approved by admin",
+        "",
+        "Tracks which SPL tokens are allowed for entry fees."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint that was approved"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "docs": [
+              "Admin who approved the token"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp of approval"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenRegistry",
+      "docs": [
+        "Token registry containing allowlist of approved SPL tokens"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "docs": [
+              "Admin who can modify the registry"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "approved_tokens",
+            "docs": [
+              "List of approved token mints"
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenRemoved",
+      "docs": [
+        "Emitted when a token is removed from approved list",
+        "",
+        "Admin can revoke token approval if needed."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint that was removed"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "docs": [
+              "Admin who removed the token"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp of removal"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WinnersDeclared",
+      "docs": [
+        "Emitted when winners are declared for a room",
+        "",
+        "Separates winner declaration from fund distribution for transparency.",
+        "Must be called before end_room."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "docs": [
+              "Room PDA for which winners were declared"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "winners",
+            "docs": [
+              "List of declared winners (1-10 winners)"
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp of winner declaration"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}
