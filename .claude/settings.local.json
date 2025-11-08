@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(git clone:*)",
+      "Bash(anchor build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nSECURITY: Comprehensive security hardening - Phase 1 & 2 complete\n\nFixed all 5 CRITICAL vulnerabilities and 8 HIGH priority security issues\nidentified in security audit. Upgraded security rating from 5/10 to 9/10.\n\n## Critical Security Fixes\n\n1. **Authorization Constraints**: Added has_one constraints to prevent\n   unauthorized access to admin/host-only functions (SetEmergencyPause,\n   DeclareWinners, CloseJoining, EndRoom, RecoverRoom, token registry)\n\n2. **Unsafe Account Closing**: Replaced manual lamport manipulation with\n   Anchor''s safe close constraint to prevent account resurrection attacks\n\n3. **PDA & Token Validation**: Added comprehensive PDA derivation constraints\n   and token account validation (mint + owner) to prevent fund misdirection\n\n4. **Re-initialization Prevention**: Enforced vault uninitialized state check\n   to prevent pre-initialization attacks with malicious parameters\n\n5. **Arithmetic Safety**: Fixed overflow in expiration calculation, added\n   winners vec size validation, fixed division by zero in recover_room\n\n6. **Input Validation**: Added validation for room_id length (1-32 chars),\n   charity_memo length (max 28 chars), and entry_fee maximum limits\n\n## High Priority Hardening\n\n7. **Program ID Validation**: Added explicit address constraints on all\n   token_program references to prevent malicious program substitution\n\n8. **BPS Validation**: Added validation that fee percentages sum correctly\n   in initialize function to prevent configuration errors\n\n9. **Enhanced Documentation**: Improved CHECK comments with detailed security\n   explanations for all unchecked accounts\n\n## New Error Code\n- Added RoomNotExpired error for proper recovery validation\n\n## Files Modified\n- src/lib.rs: 15+ Account struct security improvements\n- src/errors.rs: New error code\n- src/instructions/admin/initialize.rs: BPS validation\n- src/instructions/admin/recover_room.rs: Division by zero fix\n- src/instructions/room/init_pool_room.rs: Multiple security fixes\n- src/instructions/room/cleanup_room.rs: Safe closing\n- src/instructions/asset/init_asset_room.rs: Multiple security fixes\n- src/instructions/game/declare_winners.rs: Vec size validation\n\nSee SECURITY_FIXES.md for comprehensive details.\n\n🤖 Generated with Claude Code (https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(dir \"C:\\Users\\isich\\bingo-solana-contracts\\solana-contracts\\programs\\bingo\\src\" /B)",
+      "Bash(findstr:*)",
+      "Bash(dir \"C:\\Users\\isich\\bingo-solana-contracts\\solana-contracts\\programs\" /B)",
+      "Bash(git check-ignore:*)",
+      "Bash(anchor test:*)",
+      "Bash(Select-String -Pattern \"stack|overflow|error|Error|warning: unused\" -Context 0,2)",
+      "Bash(build.log)",
+      "Bash(yarn test)",
+      "Bash(yarn run ts-mocha:*)",
+      "Bash(solana-test-validator:*)",
+      "Bash(Select-Object -Last 5)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
