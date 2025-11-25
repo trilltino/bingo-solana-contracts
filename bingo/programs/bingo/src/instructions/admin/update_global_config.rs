@@ -14,13 +14,15 @@
 //! - Changes take effect immediately for all new rooms created after the update
 //! - Existing rooms are not affected (they store their own fee parameters)
 
+use crate::{BingoError, GlobalConfig};
 use anchor_lang::prelude::*;
+use std::str::FromStr;
 
 /// Update global configuration parameters
 ///
 /// Allows admin to modify platform fees, wallet addresses, and economic constraints.
 pub fn handler(
-    ctx: Context<crate::UpdateGlobalConfig>,
+    ctx: Context<UpdateGlobalConfig>,
     platform_wallet: Option<Pubkey>,
     charity_wallet: Option<Pubkey>,
     platform_fee_bps: Option<u16>,
@@ -65,4 +67,28 @@ pub fn handler(
     Ok(())
 }
 
-// Note: UpdateGlobalConfig struct moved to lib.rs for Anchor macro compatibility
+/// Context for updating global configuration
+#[derive(Accounts)]
+pub struct UpdateGlobalConfig<'info> {
+    /// Global configuration PDA account
+    #[account(
+        mut,
+        seeds = [b"global-config"],
+        bump = global_config.bump,
+        constraint = global_config.admin == admin.key() || is_upgrade_authority(&admin.key()) @ BingoError::Unauthorized
+    )]
+    pub global_config: Account<'info, GlobalConfig>,
+
+    /// Admin or upgrade authority account
+    pub admin: Signer<'info>,
+}
+
+/// Check if signer is the upgrade authority
+///
+/// This allows the upgrade authority to modify configuration even if not the admin.
+/// Useful for emergency situations or program upgrades.
+fn is_upgrade_authority(signer: &Pubkey) -> bool {
+    // Hardcoded upgrade authority
+    let known_authority = Pubkey::from_str("C1vn2MT7tZotZPjUJQDf9oo3dpZZ2tr7NxYLg8jTYgkw").unwrap();
+    signer == &known_authority
+}

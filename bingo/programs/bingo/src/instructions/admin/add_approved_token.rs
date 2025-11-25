@@ -5,12 +5,12 @@
 //! control over which tokens are acceptable for entry fees and prizes, preventing spam tokens
 //! or malicious mints from being used in the platform.
 
-use anchor_lang::prelude::*;
-use crate::{TokenRegistry, errors::BingoError};
 use crate::events::TokenApproved;
+use crate::{errors::BingoError, TokenRegistry};
+use anchor_lang::prelude::*;
 
 /// Add a token to the approved list
-pub fn handler(ctx: Context<crate::AddApprovedToken>, token_mint: Pubkey) -> Result<()> {
+pub fn handler(ctx: Context<AddApprovedToken>, token_mint: Pubkey) -> Result<()> {
     let registry = &mut ctx.accounts.token_registry;
 
     // Check admin
@@ -47,4 +47,18 @@ pub fn handler(ctx: Context<crate::AddApprovedToken>, token_mint: Pubkey) -> Res
     Ok(())
 }
 
-// Note: Account struct is in lib.rs
+/// Context for adding approved token
+#[derive(Accounts)]
+pub struct AddApprovedToken<'info> {
+    /// Token registry PDA account
+    #[account(
+        mut,
+        seeds = [b"token-registry-v4"],
+        bump = token_registry.bump
+    )]
+    pub token_registry: Account<'info, TokenRegistry>,
+
+    /// Admin account adding the token
+    #[account(mut)]
+    pub admin: Signer<'info>,
+}

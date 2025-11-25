@@ -16,30 +16,21 @@
 //!   .rpc();
 //! ```
 
+use crate::{BingoError, JoiningClosed as JoiningClosedEvent, Room};
 use anchor_lang::prelude::*;
-use crate::{Room, RoomStatus, BingoError, JoiningClosed as JoiningClosedEvent, CloseJoining};
 
 pub fn handler(ctx: Context<CloseJoining>, room_id: String) -> Result<()> {
     let room = &mut ctx.accounts.room;
     let host = &ctx.accounts.host;
 
     // Verify host authority
-    require!(
-        room.host == host.key(),
-        BingoError::Unauthorized
-    );
+    require!(room.host == host.key(), BingoError::Unauthorized);
 
     // Cannot close joining if room already ended
-    require!(
-        !room.ended,
-        BingoError::RoomAlreadyEnded
-    );
+    require!(!room.ended, BingoError::RoomAlreadyEnded);
 
     // Cannot close joining if already closed
-    require!(
-        !room.joining_closed,
-        BingoError::JoiningClosed
-    );
+    require!(!room.joining_closed, BingoError::JoiningClosed);
 
     // Close joining
     room.joining_closed = true;
@@ -60,4 +51,21 @@ pub fn handler(ctx: Context<CloseJoining>, room_id: String) -> Result<()> {
     );
 
     Ok(())
+}
+
+/// Context for closing room joining
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct CloseJoining<'info> {
+    /// Room PDA account
+    #[account(
+        mut,
+        seeds = [b"room", room.host.as_ref(), room_id.as_bytes()],
+        bump = room.bump
+    )]
+    pub room: Account<'info, Room>,
+
+    /// Host account closing the room
+    #[account(mut)]
+    pub host: Signer<'info>,
 }

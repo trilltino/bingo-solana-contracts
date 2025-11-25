@@ -18,12 +18,19 @@
 //! - **emergency_pause**: Circuit breaker for security incidents
 //! - **update_admin**: Transfer admin authority
 
-pub mod initialize;
-pub mod update_global_config;
-pub mod initialize_token_registry;
 pub mod add_approved_token;
-pub mod remove_approved_token;
+pub mod initialize;
+pub mod initialize_token_registry;
 pub mod recover_room;
+pub mod remove_approved_token;
 pub mod set_emergency_pause;
+pub mod update_global_config;
 
-// Account structs are in lib.rs for Anchor macro compatibility
+// Re-export Account structs for use in lib.rs
+pub use add_approved_token::AddApprovedToken;
+pub use initialize::Initialize;
+pub use initialize_token_registry::InitializeTokenRegistry;
+pub use recover_room::RecoverRoom;
+pub use remove_approved_token::RemoveApprovedToken;
+pub use set_emergency_pause::SetEmergencyPause;
+pub use update_global_config::UpdateGlobalConfig;

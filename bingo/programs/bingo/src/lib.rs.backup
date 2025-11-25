@@ -27,8 +27,9 @@
 //! - **Prize Pool**: 0-35% (configurable) - Rewards to winners
 //! - **Charity**: 40%+ minimum (calculated remainder) - Primary beneficiary
 //!
-//! **Critical Feature**: All "extras" payments (tips beyond entry fee) go 100% to charity,
-//! maximizing fundraising impact while maintaining transparent accounting.
+//! **Critical Feature**: Optional "extras" payments (tips beyond entry fee) expand the
+//! total pool and are split using the same immutable percentages, ensuring 100% of all
+//! collected funds respect the configured allocation.
 //!
 //! ## Module Organization
 //!

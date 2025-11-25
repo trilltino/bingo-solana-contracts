@@ -209,17 +209,17 @@
 //! 4. **Amendment**: Allow host to change winners before end_room (with event trail)
 //! 5. **Automatic Declaration**: AI/oracle could declare winners based on on-chain game state
 
-use anchor_lang::prelude::*;
-use crate::state::RoomStatus;
 use crate::errors::BingoError;
 use crate::events::WinnersDeclared;
+use crate::state::RoomStatus;
+use anchor_lang::prelude::*;
 
 /// Declare winners for a room
 ///
 /// Host-only instruction to officially declare 1-3 winners before fund distribution.
 /// Winners are validated for uniqueness, host exclusion, and actual room participation.
 pub fn handler<'info>(
-    ctx: Context<'_, '_, '_, 'info, crate::DeclareWinners<'info>>,
+    ctx: Context<'_, '_, '_, 'info, DeclareWinners<'info>>,
     _room_id: String,
     winners: Vec<Pubkey>,
 ) -> Result<()> {
@@ -238,16 +238,10 @@ pub fn handler<'info>(
     );
 
     // Validation: Room must not be ended
-    require!(
-        !room.ended,
-        BingoError::RoomAlreadyEnded
-    );
+    require!(!room.ended, BingoError::RoomAlreadyEnded);
 
     // Validation: Winners not already declared
-    require!(
-        room.winners.is_empty(),
-        BingoError::WinnersAlreadyDeclared
-    );
+    require!(room.winners.is_empty(), BingoError::WinnersAlreadyDeclared);
 
     // Validation: Must have 1-10 winners
     require!(
@@ -271,10 +265,7 @@ pub fn handler<'info>(
 
     // Validation: Host cannot be a winner
     for winner in &winners {
-        require!(
-            *winner != room.host,
-            BingoError::HostCannotBeWinner
-        );
+        require!(*winner != room.host, BingoError::HostCannotBeWinner);
     }
 
     // NEW VALIDATION: Winners must have actually joined the room
@@ -288,11 +279,7 @@ pub fn handler<'info>(
         // Derive the expected PlayerEntry PDA for this winner
         // Seeds: ["player", room_pubkey, player_pubkey] - must match join_room.rs
         let (expected_player_entry_pda, _bump) = Pubkey::find_program_address(
-            &[
-                b"player",
-                room.key().as_ref(),
-                winner.as_ref(),
-            ],
+            &[b"player", room.key().as_ref(), winner.as_ref()],
             ctx.program_id,
         );
 
@@ -317,7 +304,11 @@ pub fn handler<'info>(
             BingoError::InvalidPlayerEntry
         );
 
-        msg!("   Winner {} verified: {} (PlayerEntry exists)", i + 1, winner);
+        msg!(
+            "   Winner {} verified: {} (PlayerEntry exists)",
+            i + 1,
+            winner
+        );
     }
 
     // Store winners in room (pad with None for unfilled positions)
@@ -339,4 +330,19 @@ pub fn handler<'info>(
     Ok(())
 }
 
-// Note: DeclareWinners struct moved to lib.rs for Anchor macro compatibility
+/// Context for declaring winners
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct DeclareWinners<'info> {
+    /// Room PDA account
+    #[account(
+        mut,
+        seeds = [b"room", room.host.as_ref(), room_id.as_bytes()],
+        bump = room.bump,
+    )]
+    pub room: Account<'info, Room>,
+
+    /// Host account declaring winners
+    #[account(mut)]
+    pub host: Signer<'info>,
+}

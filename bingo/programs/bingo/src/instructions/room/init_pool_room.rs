@@ -43,13 +43,14 @@
 //!   - entry_fee: Amount players must pay (in token base units, e.g., 1000000 = 1 USDC)
 //!   - max_players: Room capacity (1-1000 players)
 //!   - host_fee_bps: Host compensation (0-500 = 0-5%)
-//!   - prize_pool_bps: Prize pool size (0-3500 = 0-35%)
+//!   - prize_pool_bps: Prize pool size (must be > 0)
 //!   - [first|second|third]_place_pct: Prize split percentages (must sum to 100)
 //!
-//! Auto-calculated:
-//!   - charity_bps: 10000 - platform_fee(2000) - host_fee_bps - prize_pool_bps
-//!   - Must be >= 4000 (40%), enforced by validation
-//!   - host_fee + prize_pool must not exceed 4000 (40% combined)
+//! Validation Rules:
+//!   - prize_pool_bps must be > 0
+//!   - host_fee_bps + prize_pool_bps must not exceed 4000 (40% combined)
+//!   - charity_bps = 10000 - platform_fee(2000) - host_fee_bps - prize_pool_bps
+//!   - charity_bps must be >= 4000 (40%), enforced by validation
 //!
 //! Example 1: Generous host maximizing charity
 //!   host_fee_bps: 0 (0%)
@@ -59,6 +60,11 @@
 //! Example 2: Competitive room maximizing prizes
 //!   host_fee_bps: 500 (5%)
 //!   prize_pool_bps: 3500 (35%)
+//!   → charity_bps: 4000 (40%)  ← Exactly 40% minimum to charity
+//!
+//! Example 3: Host takes nothing, maximum for prizes
+//!   host_fee_bps: 0 (0%)
+//!   prize_pool_bps: 4000 (40%)
 //!   → charity_bps: 4000 (40%)  ← Exactly 40% minimum to charity
 //! ```
 //!
@@ -159,17 +165,18 @@
 //! 3. **Entry Fee**: Must be > 0 (free rooms not allowed)
 //! 4. **Max Players**: 1-1000 (prevents DoS via unbounded storage)
 //! 5. **Host Fee**: 0-500 bps (0-5%, enforced by GlobalConfig.max_host_fee_bps)
-//! 6. **Prize Pool**: 0-4000 bps (0-40%, enforced by GlobalConfig.max_prize_pool_bps)
+//! 6. **Prize Pool**: Must be > 0 and host_fee + prize_pool ≤ 4000 bps (40%)
 //! 7. **Prize Distribution**: first + second + third = 100 exactly
-//! 8. **Charity Minimum**: charity_bps >= 3500 (35%, enforced by GlobalConfig.min_charity_bps)
+//! 8. **Charity Minimum**: charity_bps >= 4000 (40%, enforced by GlobalConfig.min_charity_bps)
 //!
 //! ## Error Conditions
 //!
 //! This instruction fails if:
 //! - Room with same (host, room_id) already exists
 //! - Host fee exceeds 5% (HostFeeTooHigh)
-//! - Prize pool exceeds 40% (PrizePoolTooHigh)
-//! - Charity would be below 35% (CharityBelowMinimum)
+//! - Prize pool is 0 (PrizePoolTooLow)
+//! - Host fee + prize pool exceeds 40% (PrizePoolTooHigh)
+//! - Charity would be below 40% (CharityBelowMinimum)
 //! - Prize distribution doesn't sum to 100 (InvalidPrizeDistribution)
 //! - Invalid room_id length (InvalidRoomId)
 //! - Invalid entry_fee (InvalidEntryFee)
@@ -214,15 +221,15 @@
 //! - **Input Validation**: All parameters validated before state changes
 //! - **Deterministic Addressing**: Room addresses derived from (host + room_id) prevent collisions
 
-use anchor_lang::prelude::*;
-use crate::state::{RoomStatus, PrizeMode};
 use crate::errors::BingoError;
 use crate::events::RoomCreated;
-use crate::security::{EmergencyGuard, InputValidator, AmountValidator};
+use crate::state::{PrizeMode, RoomStatus};
+use crate::validation::{AmountValidator, EmergencyGuard, InputValidator};
+use anchor_lang::prelude::*;
 
 /// Create a pool-based room where prizes come from entry fee pool
 pub fn handler(
-    ctx: Context<crate::InitPoolRoom>,
+    ctx: Context<InitPoolRoom>,
     room_id: String,
     charity_wallet: Pubkey,
     entry_fee: u64,
@@ -296,7 +303,10 @@ pub fn handler(
         // SECURITY: Validate existing vault is a proper TokenAccount
         use anchor_spl::token::TokenAccount;
 
-        let vault_data = ctx.accounts.room_vault.try_borrow_data()
+        let vault_data = ctx
+            .accounts
+            .room_vault
+            .try_borrow_data()
             .map_err(|_| BingoError::InvalidVaultAccount)?;
 
         let vault_account = TokenAccount::try_deserialize(&mut vault_data.as_ref())
@@ -317,10 +327,11 @@ pub fn handler(
 
     // Validate token is approved in registry
     require!(
-        ctx.accounts.token_registry.is_token_approved(&ctx.accounts.fee_token_mint.key()),
+        ctx.accounts
+            .token_registry
+            .is_token_approved(&ctx.accounts.fee_token_mint.key()),
         BingoError::TokenNotApproved
     );
-
 
     // Validate host fee (max 5%)
     require!(
@@ -328,27 +339,20 @@ pub fn handler(
         BingoError::HostFeeTooHigh
     );
 
-    // Validate prize pool (max 35%)
-    require!(
-        prize_pool_bps <= ctx.accounts.global_config.max_prize_pool_bps,
-        BingoError::PrizePoolTooHigh
-    );
+    // Validate prize pool must be greater than 0
+    require!(prize_pool_bps > 0, BingoError::PrizePoolTooLow);
 
     // Validate combined host + prizes does not exceed 40%
     const MAX_COMBINED_BPS: u16 = 4000; // 40% max for host + prizes combined
     require!(
         host_fee_bps.saturating_add(prize_pool_bps) <= MAX_COMBINED_BPS,
-        BingoError::PrizePoolTooHigh // Reuse same error since it's prize-related
+        BingoError::PrizePoolTooHigh
     );
 
     // Validate prize distribution sums to 100
-    let total_prize_pct = first_place_pct
-        + second_place_pct.unwrap_or(0)
-        + third_place_pct.unwrap_or(0);
-    require!(
-        total_prize_pct == 100,
-        BingoError::InvalidPrizeDistribution
-    );
+    let total_prize_pct =
+        first_place_pct + second_place_pct.unwrap_or(0) + third_place_pct.unwrap_or(0);
+    require!(total_prize_pct == 100, BingoError::InvalidPrizeDistribution);
 
     // Initialize room
     let room = &mut ctx.accounts.room;
@@ -374,7 +378,11 @@ pub fn handler(
     );
 
     room.prize_mode = PrizeMode::PoolSplit;
-    room.prize_distribution = vec![first_place_pct, second_place_pct.unwrap_or(0), third_place_pct.unwrap_or(0)];
+    room.prize_distribution = vec![
+        first_place_pct,
+        second_place_pct.unwrap_or(0),
+        third_place_pct.unwrap_or(0),
+    ];
     room.status = RoomStatus::Ready;
     room.player_count = 0;
     room.max_players = max_players;
@@ -402,8 +410,12 @@ pub fn handler(
     msg!("Pool room created: {}", room_id);
     msg!("   Entry fee: {} lamports", entry_fee);
     msg!("   Max players: {}", max_players);
-    msg!("   Host fee: {}bps, Prize pool: {}bps, Charity: {}bps",
-        host_fee_bps, prize_pool_bps, room.charity_bps);
+    msg!(
+        "   Host fee: {}bps, Prize pool: {}bps, Charity: {}bps",
+        host_fee_bps,
+        prize_pool_bps,
+        room.charity_bps
+    );
 
     // Emit event for off-chain indexers and frontend
     emit!(RoomCreated {
@@ -419,4 +431,55 @@ pub fn handler(
     Ok(())
 }
 
-// Note: InitPoolRoom struct moved to lib.rs for Anchor macro compatibility
+/// Context for initializing a pool-based room
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct InitPoolRoom<'info> {
+    /// Room PDA account
+    #[account(
+        init,
+        payer = host,
+        space = Room::LEN,
+        seeds = [b"room", host.key().as_ref(), room_id.as_bytes()],
+        bump
+    )]
+    pub room: Account<'info, Room>,
+
+    /// CHECK: Room vault PDA - using AccountInfo because vault is created in same instruction as room. Handler validates TokenAccount structure manually.
+    #[account(
+        mut,
+        seeds = [b"room-vault", room.key().as_ref()],
+        bump
+    )]
+    pub room_vault: AccountInfo<'info>,
+
+    /// Token mint for entry fees
+    pub fee_token_mint: Account<'info, anchor_spl::token::Mint>,
+
+    /// Token registry PDA
+    #[account(
+        seeds = [b"token-registry-v4"],
+        bump = token_registry.bump
+    )]
+    pub token_registry: Account<'info, TokenRegistry>,
+
+    /// Global configuration PDA
+    #[account(
+        seeds = [b"global-config"],
+        bump = global_config.bump
+    )]
+    pub global_config: Account<'info, GlobalConfig>,
+
+    /// Host account creating the room
+    #[account(mut)]
+    pub host: Signer<'info>,
+
+    /// System program for account creation
+    pub system_program: Program<'info, System>,
+
+    /// Token program for token account initialization
+    pub token_program: Program<'info, anchor_spl::token::Token>,
+
+    /// Rent sysvar for account sizing
+    pub rent: Sysvar<'info, Rent>,
+}

@@ -1,10 +1,10 @@
-//! # Fundraisely State Management Module
+//! # Fundraisely Accounts Module
 //!
 //! On-chain state structures for the Fundraisely smart contract.
 //!
 //! ## Overview
 //!
-//! This module defines the three core state structures that persist data on the Solana blockchain:
+//! This module defines the core account structures that persist data on-chain:
 //!
 //! 1. **GlobalConfig** (global_config.rs) - Platform-wide configuration (singleton)
 //! 2. **Room** (room.rs) - Individual game room state (per-room PDA)
@@ -75,8 +75,8 @@
 //!
 //! State accounts maintain critical financial data for transparent accounting:
 //!
-//! - **Room.total_entry_fees**: Sum of all entry fees (split per economic model)
-//! - **Room.total_extras_fees**: Sum of all extras (100% to charity)
+//! - **Room.total_entry_fees**: Sum of all entry fees (baseline analytic)
+//! - **Room.total_extras_fees**: Sum of all extras (also part of split pool)
 //! - **Room.total_collected**: Grand total (entry + extras)
 //! - **Room.charity_bps**: Calculated charity percentage (min 40%)
 //! - **PlayerEntry.entry_paid**: Individual entry fee contribution
@@ -98,11 +98,11 @@
 //! This ensures state changes are atomic, validated, and impossible to forge.
 
 pub mod global_config;
-pub mod room;
 pub mod player_entry;
+pub mod room;
 pub mod token_registry;
 
 pub use global_config::*;
-pub use room::*;
 pub use player_entry::*;
+pub use room::*;
 pub use token_registry::*;

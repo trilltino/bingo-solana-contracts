@@ -32,19 +32,19 @@
 //! GlobalConfig enforces the platform's economic constraints through validation at room creation:
 //!
 //! ### Fixed Platform Fee
-//! - **platform_fee_bps**: 2000 (20% of entry fees)
+//! - **platform_fee_bps**: 2000 (20% of the total pool)
 //! - Non-negotiable infrastructure and development cost
-//! - Applied to entry fees only (not extras)
+//! - Applied to the combined total of entry fees + extras
 //!
 //! ### Configurable Limits
 //! - **max_host_fee_bps**: 500 (5% maximum)
 //!   - Incentivizes room creation while preventing excessive host compensation
 //!   - Host chooses fee between 0-5% at room creation
 //!
-//! - **max_prize_pool_bps**: 3500 (35% maximum)
-//!   - Balances competitive incentives with charitable mission
-//!   - Host chooses prize pool between 0-35% at room creation
-//!   - Combined with host fee, cannot exceed 40%
+//! - **max_prize_pool_bps**: Not used for validation anymore
+//!   - Prize pool is validated by: prize_pool_bps > 0 AND host_fee + prize_pool ≤ 40%
+//!   - Host decides how to split the 40%: 0-5% for themselves, remainder for prizes
+//!   - This allows up to 40% for prizes if host takes 0%
 //!
 //! - **min_charity_bps**: 4000 (40% minimum)
 //!   - Ensures substantial portion of entry fees benefit charitable causes
@@ -58,7 +58,7 @@
 //! Where:
 //!   platform_fee_bps = 2000 (fixed)
 //!   host_fee_bps = 0-500 (host choice)
-//!   prize_pool_bps = 0-3500 (host choice)
+//!   prize_pool_bps > 0 (host choice, must be positive)
 //!   charity_bps >= 4000 (calculated remainder)
 //!   host_fee_bps + prize_pool_bps <= 4000 (40% combined max)
 //! ```
@@ -95,8 +95,8 @@
 //!
 //! ## Wallet Configuration
 //!
-//! - **platform_wallet**: Receives 20% of entry fees for platform operations
-//! - **charity_wallet**: Receives charity allocation (40%+ of entry fees + 100% of extras)
+//! - **platform_wallet**: Receives the platform percentage of every collected token
+//! - **charity_wallet**: Receives the remainder after platform/host/prize allocations
 //!
 //! Both wallets must have associated token accounts for the fee_token_mint used in each room.
 //!

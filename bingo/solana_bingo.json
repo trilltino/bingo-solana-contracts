@@ -2430,7 +2430,7 @@
             "name": "charity_wallet",
             "docs": [
               "Charity wallet address (per-room, from The Giving Block or custom)",
-              "Receives the charity portion of entry fees + 100% of extras"
+              "Receives the charity portion (remainder after other allocations)"
             ],
             "type": "pubkey"
           },
@@ -2759,7 +2759,7 @@
           {
             "name": "charity_amount",
             "docs": [
-              "Amount sent to charity (includes all extras)"
+              "Amount sent to charity (remainder after platform/host/prize)"
             ],
             "type": "u64"
           },

@@ -17,9 +17,9 @@
 //!   .rpc();
 //! ```
 
+use crate::{BingoError, GlobalConfig, Room, RoomCleaned};
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, TokenAccount, CloseAccount};
-use crate::{Room, GlobalConfig, BingoError, RoomCleaned, CleanupRoom};
+use anchor_spl::token::{self, CloseAccount};
 
 pub fn handler(ctx: Context<CleanupRoom>, room_id: String) -> Result<()> {
     let room = &ctx.accounts.room;
@@ -30,33 +30,20 @@ pub fn handler(ctx: Context<CleanupRoom>, room_id: String) -> Result<()> {
     // Verify caller is either host or admin
     let is_host = room.host == caller.key();
     let is_admin = global_config.admin == caller.key();
-    require!(
-        is_host || is_admin,
-        BingoError::InsufficientAuthority
-    );
+    require!(is_host || is_admin, BingoError::InsufficientAuthority);
 
     // Room must be ended
-    require!(
-        room.ended,
-        BingoError::InvalidRoomStatus
-    );
+    require!(room.ended, BingoError::InvalidRoomStatus);
 
     // Vault must be empty
-    require!(
-        room_vault.amount == 0,
-        BingoError::VaultNotEmpty
-    );
+    require!(room_vault.amount == 0, BingoError::VaultNotEmpty);
 
     // Get rent before closing
     let rent_reclaimed = room_vault.to_account_info().lamports();
 
     // Close the vault account using PDA signer
     let room_key = room.key();
-    let signer_seeds: &[&[&[u8]]] = &[&[
-        b"room-vault",
-        room_key.as_ref(),
-        &[ctx.bumps.room_vault],
-    ]];
+    let signer_seeds: &[&[&[u8]]] = &[&[b"room-vault", room_key.as_ref(), &[ctx.bumps.room_vault]]];
 
     let cpi_accounts = CloseAccount {
         account: room_vault.to_account_info(),
@@ -85,4 +72,41 @@ pub fn handler(ctx: Context<CleanupRoom>, room_id: String) -> Result<()> {
     );
 
     Ok(())
+}
+
+/// Context for cleaning up room
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct CleanupRoom<'info> {
+    /// Room PDA account
+    #[account(
+        mut,
+        seeds = [b"room", room.host.as_ref(), room_id.as_bytes()],
+        bump = room.bump
+    )]
+    pub room: Account<'info, Room>,
+
+    /// Room vault token account (must be empty)
+    #[account(
+        mut,
+        seeds = [b"room-vault", room.key().as_ref()],
+        bump,
+        token::authority = room,
+        token::mint = room.fee_token_mint
+    )]
+    pub room_vault: Account<'info, anchor_spl::token::TokenAccount>,
+
+    /// Global configuration PDA
+    #[account(
+        seeds = [b"global-config"],
+        bump = global_config.bump
+    )]
+    pub global_config: Account<'info, GlobalConfig>,
+
+    /// Caller account (host or admin)
+    #[account(mut)]
+    pub caller: Signer<'info>,
+
+    /// Token program for token operations
+    pub token_program: Program<'info, anchor_spl::token::Token>,
 }

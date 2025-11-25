@@ -2,15 +2,15 @@
 //!
 //! Escrows a prize asset into the room's prize vault for asset-based rooms
 
-use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Transfer};
-use crate::state::RoomStatus;
 use crate::errors::BingoError;
 use crate::events::PrizeAssetDeposited;
+use crate::state::RoomStatus;
+use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Transfer};
 
 /// Escrow a prize asset into the room
 pub fn handler(
-    ctx: Context<crate::AddPrizeAsset>,
+    ctx: Context<AddPrizeAsset>,
     _room_id: String,
     prize_index: u8, // 0, 1, or 2
 ) -> Result<()> {
@@ -60,7 +60,11 @@ pub fn handler(
     // Mark as deposited
     prize_asset.deposited = true;
 
-    msg!("Prize {} deposited: {} tokens", prize_index + 1, prize_asset.amount);
+    msg!(
+        "Prize {} deposited: {} tokens",
+        prize_index + 1,
+        prize_asset.amount
+    );
 
     // Emit event
     emit!(PrizeAssetDeposited {
@@ -73,9 +77,10 @@ pub fn handler(
     });
 
     // Check if all prizes are now deposited
-    let all_deposited = room.prize_assets.iter().all(|asset| {
-        asset.as_ref().map_or(true, |a| a.deposited)
-    });
+    let all_deposited = room
+        .prize_assets
+        .iter()
+        .all(|asset| asset.as_ref().map_or(true, |a| a.deposited));
 
     if all_deposited {
         room.status = RoomStatus::Ready;
@@ -86,4 +91,32 @@ pub fn handler(
     }
 
     Ok(())
+}
+
+/// Context for adding prize asset
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct AddPrizeAsset<'info> {
+    /// Room PDA account
+    #[account(
+        mut,
+        seeds = [b"room", room.host.as_ref(), room_id.as_bytes()],
+        bump = room.bump
+    )]
+    pub room: Account<'info, Room>,
+
+    /// Prize vault token account (destination)
+    #[account(mut)]
+    pub prize_vault: Account<'info, anchor_spl::token::TokenAccount>,
+
+    /// Host token account (source of funds)
+    #[account(mut)]
+    pub host_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+
+    /// Host account depositing the prize
+    #[account(mut)]
+    pub host: Signer<'info>,
+
+    /// Token program for token transfers
+    pub token_program: Program<'info, anchor_spl::token::Token>,
 }

@@ -17,8 +17,11 @@
 //! - **close_joining**: Stop accepting new players before max_players reached
 //! - **update_expiration**: Extend or shorten room expiration time
 
-pub mod init_pool_room;
-pub mod close_joining;
 pub mod cleanup_room;
+pub mod close_joining;
+pub mod init_pool_room;
 
-// InitPoolRoom struct is now in lib.rs for Anchor macro compatibility
+// Re-export Account structs for use in lib.rs
+pub use cleanup_room::CleanupRoom;
+pub use close_joining::CloseJoining;
+pub use init_pool_room::InitPoolRoom;

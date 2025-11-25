@@ -40,4 +40,6 @@
 pub mod declare_winners;
 pub mod end_room;
 
-// DeclareWinners and EndRoom structs are now in lib.rs for Anchor macro compatibility
+// Re-export Account structs for use in lib.rs
+pub use declare_winners::DeclareWinners;
+pub use end_room::EndRoom;

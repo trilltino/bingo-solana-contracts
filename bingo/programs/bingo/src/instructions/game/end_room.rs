@@ -1,38 +1,55 @@
 //! # End Room Instruction
 //!
 //! Finalize room, distribute prizes, and transfer charity donations.
+//!
+//! ## Charity Wallet Support
+//!
+//! This instruction supports dynamic charity wallet addresses, enabling integration with
+//! The Giving Block (TGB) API and other systems that provide per-transaction charity addresses.
+//!
+//! The `charity_token_account` parameter accepts ANY valid SPL TokenAccount and is NOT
+//! validated against `GlobalConfig.charity_wallet`. This allows:
+//!
+//! - **TGB Dynamic Wallets**: Each transaction can use a different charity wallet address
+//!   returned by the TGB API for that specific transaction/intent.
+//! - **Custom Charity Wallets**: Hosts can specify custom charity wallets per-room or per-transaction.
+//! - **Per-Room Configuration**: Rooms can route charity donations to different wallets.
+//!
+//! Security: The charity_token_account is validated as a valid SPL TokenAccount by Anchor,
+//! ensuring it's a properly formatted token account, but the owner wallet address is not restricted.
 
-use anchor_lang::prelude::*;
-use crate::state::{RoomStatus, PrizeMode};
 use crate::errors::BingoError;
 use crate::events::RoomEnded;
-use crate::instructions::utils::calculate_bps;
-use crate::security::{ReentrancyGuard, EmergencyGuard};
+use crate::state::{PrizeMode, RoomStatus};
+use crate::utils::calculate_bps;
+use crate::validation::{EmergencyGuard, ReentrancyGuard};
+use anchor_lang::prelude::*;
 
 /// End room and distribute prizes to winners
 pub fn handler<'info>(
-    ctx: Context<'_, '_, '_, 'info, crate::EndRoom<'info>>,
+    ctx: Context<'_, '_, '_, 'info, EndRoom<'info>>,
     _room_id: String,
     winners: Vec<Pubkey>,
 ) -> Result<()> {
-    // REENTRANCY PROTECTION: Check and set flags FIRST before any external calls
+    // REENTRANCY & EMERGENCY PROTECTION
+    EmergencyGuard::check_not_paused(ctx.accounts.global_config.emergency_pause)?;
     ReentrancyGuard::check_room_not_ended(ctx.accounts.room.ended)?;
 
+    // Set flags before any external calls (checks-effects-interactions pattern)
+    // Validate room status and set ended flag immediately to prevent reentrancy
     require!(
         ctx.accounts.room.status == RoomStatus::Active,
         BingoError::InvalidRoomStatus
     );
 
-    // Set ended flag immediately to prevent reentrancy
-    ReentrancyGuard::set_ended_flag(
-        &mut ctx.accounts.room.ended,
-        &mut ctx.accounts.room.status,
-        RoomStatus::Ended,
-    )?;
+    // Set ended flag and status before making external calls (checks-effects-interactions pattern)
+    ctx.accounts.room.ended = true;
+    ctx.accounts.room.status = RoomStatus::Ended;
 
     // Read room data and validate
     let current_slot = Clock::get()?.slot;
-    let is_expired = ctx.accounts.room.expiration_slot > 0 && current_slot >= ctx.accounts.room.expiration_slot;
+    let is_expired =
+        ctx.accounts.room.expiration_slot > 0 && current_slot >= ctx.accounts.room.expiration_slot;
 
     // Validation - only host can end room, unless it's expired (anyone can close expired rooms)
     if !is_expired {
@@ -66,25 +83,29 @@ pub fn handler<'info>(
         &winners
     };
 
-    // Calculate fee distribution
+    // Calculate total pool (entry fees + extras)
     let entry_fees_total = ctx.accounts.room.total_entry_fees;
     let extras_total = ctx.accounts.room.total_extras_fees;
+    let total_pool = entry_fees_total
+        .checked_add(extras_total)
+        .ok_or(BingoError::ArithmeticOverflow)?;
 
-    // Apply percentage splits to entry fees only
-    let platform_fee = calculate_bps(entry_fees_total, ctx.accounts.global_config.platform_fee_bps)?;
-    let host_fee = calculate_bps(entry_fees_total, ctx.accounts.room.host_fee_bps)?;
-    let prize_amount = calculate_bps(entry_fees_total, ctx.accounts.room.prize_pool_bps)?;
+    // Apply percentage splits to TOTAL POOL (not just entry fees)
+    let platform_fee = calculate_bps(total_pool, ctx.accounts.global_config.platform_fee_bps)?;
+    let host_fee = calculate_bps(total_pool, ctx.accounts.room.host_fee_bps)?;
 
-    // Charity gets remainder of entry fees PLUS all extras
-    let charity_from_entry_fees = entry_fees_total
+    // Calculate prize pool amount based on prize mode
+    let prize_amount = match ctx.accounts.room.prize_mode {
+        PrizeMode::AssetBased => 0u64,
+        PrizeMode::PoolSplit => calculate_bps(total_pool, ctx.accounts.room.prize_pool_bps)?,
+    };
+
+    // Charity gets remainder
+    let charity_amount = total_pool
         .checked_sub(platform_fee)
         .and_then(|v| v.checked_sub(host_fee))
         .and_then(|v| v.checked_sub(prize_amount))
         .ok_or(BingoError::ArithmeticUnderflow)?;
-
-    let charity_amount = charity_from_entry_fees
-        .checked_add(extras_total)
-        .ok_or(BingoError::ArithmeticOverflow)?;
 
     // Save values for event - OPTIMIZATION: pre-calculate to reduce stack usage
     let player_count = ctx.accounts.room.player_count;
@@ -106,7 +127,12 @@ pub fn handler<'info>(
                     to: ctx.accounts.platform_token_account.to_account_info(),
                     authority: ctx.accounts.room.to_account_info(),
                 },
-                &[&[b"room".as_ref(), ctx.accounts.room.host.as_ref(), ctx.accounts.room.room_id.as_bytes(), &bump_bytes]],
+                &[&[
+                    b"room".as_ref(),
+                    ctx.accounts.room.host.as_ref(),
+                    ctx.accounts.room.room_id.as_bytes(),
+                    &bump_bytes,
+                ]],
             ),
             platform_fee,
         )?;
@@ -122,13 +148,33 @@ pub fn handler<'info>(
                     to: ctx.accounts.host_token_account.to_account_info(),
                     authority: ctx.accounts.room.to_account_info(),
                 },
-                &[&[b"room".as_ref(), ctx.accounts.room.host.as_ref(), ctx.accounts.room.room_id.as_bytes(), &bump_bytes]],
+                &[&[
+                    b"room".as_ref(),
+                    ctx.accounts.room.host.as_ref(),
+                    ctx.accounts.room.room_id.as_bytes(),
+                    &bump_bytes,
+                ]],
             ),
             host_fee,
         )?;
     }
 
     // Transfer charity donation
+    //
+    // IMPORTANT: The charity_token_account is NOT validated against GlobalConfig.charity_wallet.
+    // This allows the frontend to pass ANY valid token account, enabling support for:
+    //
+    // 1. The Giving Block (TGB) dynamic wallet addresses - Each transaction can use a different
+    //    charity wallet address returned by the TGB API for that specific transaction/intent.
+    //
+    // 2. Custom charity wallets - Hosts can specify custom charity wallets per-room or per-transaction.
+    //
+    // 3. Per-room charity configuration - Rooms can have different charity wallets stored in
+    //    room.charity_wallet (though this is not currently validated either).
+    //
+    // Security: The charity_token_account is still validated as a valid SPL TokenAccount by Anchor,
+    // but its owner (the actual charity wallet) is not restricted to GlobalConfig.charity_wallet.
+    // This provides flexibility for dynamic charity routing while maintaining token account safety.
     if charity_amount > 0 {
         anchor_spl::token::transfer(
             CpiContext::new_with_signer(
@@ -138,7 +184,12 @@ pub fn handler<'info>(
                     to: ctx.accounts.charity_token_account.to_account_info(),
                     authority: ctx.accounts.room.to_account_info(),
                 },
-                &[&[b"room".as_ref(), ctx.accounts.room.host.as_ref(), ctx.accounts.room.room_id.as_bytes(), &bump_bytes]],
+                &[&[
+                    b"room".as_ref(),
+                    ctx.accounts.room.host.as_ref(),
+                    ctx.accounts.room.room_id.as_bytes(),
+                    &bump_bytes,
+                ]],
             ),
             charity_amount,
         )?;
@@ -174,14 +225,18 @@ pub fn handler<'info>(
                 }
 
                 // Calculate this position's prize amount
-                let mut total_amount = (prize_amount as u128 * winner_distribution as u128 / 100) as u64;
+                let mut total_amount =
+                    (prize_amount as u128 * winner_distribution as u128 / 100) as u64;
 
                 // Aggregate any duplicate entries for this winner (same pubkey in other positions)
                 for j in (i + 1)..winners_to_use.len().min(10) {
-                    if !processed[j] &&
-                       j < ctx.accounts.room.prize_distribution.len() &&
-                       winners_to_use[j] == winner_pubkey {
-                        let additional_amount = (prize_amount as u128 * ctx.accounts.room.prize_distribution[j] as u128 / 100) as u64;
+                    if !processed[j]
+                        && j < ctx.accounts.room.prize_distribution.len()
+                        && winners_to_use[j] == winner_pubkey
+                    {
+                        let additional_amount = (prize_amount as u128
+                            * ctx.accounts.room.prize_distribution[j] as u128
+                            / 100) as u64;
                         total_amount += additional_amount;
                         processed[j] = true;
                     }
@@ -199,7 +254,9 @@ pub fn handler<'info>(
 
                     // Deserialize and validate the token account (only once per unique winner)
                     let token_account_data = winner_token_account_info.try_borrow_data()?;
-                    let winner_token_account = anchor_spl::token::TokenAccount::try_deserialize(&mut &token_account_data[..])?;
+                    let winner_token_account = anchor_spl::token::TokenAccount::try_deserialize(
+                        &mut &token_account_data[..],
+                    )?;
 
                     // Verify token account mint matches room's fee token mint
                     require!(
@@ -224,17 +281,26 @@ pub fn handler<'info>(
                                 to: winner_token_account_info.to_account_info(),
                                 authority: ctx.accounts.room.to_account_info(),
                             },
-                            &[&[b"room".as_ref(), ctx.accounts.room.host.as_ref(), ctx.accounts.room.room_id.as_bytes(), &bump_bytes]],
+                            &[&[
+                                b"room".as_ref(),
+                                ctx.accounts.room.host.as_ref(),
+                                ctx.accounts.room.room_id.as_bytes(),
+                                &bump_bytes,
+                            ]],
                         ),
                         total_amount,
                     )?;
 
-                    msg!("   Winner: {} receives {} tokens (aggregated)", winner_pubkey, total_amount);
+                    msg!(
+                        "   Winner: {} receives {} tokens (aggregated)",
+                        winner_pubkey,
+                        total_amount
+                    );
                 }
 
                 processed[i] = true;
             }
-        },
+        }
         PrizeMode::AssetBased => {
             // Asset-based prize distribution
             // Distribute pre-deposited prize assets to winners
@@ -243,17 +309,23 @@ pub fn handler<'info>(
             // [winners_count..winners_count*2] = winner token accounts for prize assets
             // [winners_count*2..winners_count*2+3] = prize vault accounts
 
-            msg!("Distributing asset-based prizes to {} winners", winners_to_use.len());
+            msg!(
+                "Distributing asset-based prizes to {} winners",
+                winners_to_use.len()
+            );
 
             let prize_vault_offset = winners_to_use.len() * 2;
 
-            for (prize_index, prize_asset_opt) in ctx.accounts.room.prize_assets.iter().enumerate() {
+            for (prize_index, prize_asset_opt) in ctx.accounts.room.prize_assets.iter().enumerate()
+            {
                 if let Some(prize_asset) = prize_asset_opt {
                     // Only distribute if prize was deposited and we have a winner for this position
                     if prize_asset.deposited && prize_index < winners_to_use.len() {
                         let winner = winners_to_use[prize_index];
-                        let winner_token_account_info = &ctx.remaining_accounts[winners_to_use.len() + prize_index];
-                        let prize_vault_info = &ctx.remaining_accounts[prize_vault_offset + prize_index];
+                        let winner_token_account_info =
+                            &ctx.remaining_accounts[winners_to_use.len() + prize_index];
+                        let prize_vault_info =
+                            &ctx.remaining_accounts[prize_vault_offset + prize_index];
 
                         // Verify prize vault is owned by token program
                         require!(
@@ -269,7 +341,10 @@ pub fn handler<'info>(
 
                         // Deserialize and validate winner token account
                         let winner_token_data = winner_token_account_info.try_borrow_data()?;
-                        let winner_token_account = anchor_spl::token::TokenAccount::try_deserialize(&mut &winner_token_data[..])?;
+                        let winner_token_account =
+                            anchor_spl::token::TokenAccount::try_deserialize(
+                                &mut &winner_token_data[..],
+                            )?;
 
                         // Verify winner token account mint matches prize asset mint
                         require!(
@@ -288,14 +363,11 @@ pub fn handler<'info>(
                         let room_key = ctx.accounts.room.key();
                         let prize_index_bytes = [prize_index as u8];
 
-                        let (expected_prize_vault, _prize_vault_bump) = Pubkey::find_program_address(
-                            &[
-                                b"prize-vault",
-                                room_key.as_ref(),
-                                &prize_index_bytes,
-                            ],
-                            ctx.program_id,
-                        );
+                        let (expected_prize_vault, _prize_vault_bump) =
+                            Pubkey::find_program_address(
+                                &[b"prize-vault", room_key.as_ref(), &prize_index_bytes],
+                                ctx.program_id,
+                            );
 
                         // Verify the prize vault matches expected PDA
                         require!(
@@ -313,13 +385,23 @@ pub fn handler<'info>(
                                     to: winner_token_account_info.to_account_info(),
                                     authority: ctx.accounts.room.to_account_info(),
                                 },
-                                &[&[b"room".as_ref(), ctx.accounts.room.host.as_ref(), ctx.accounts.room.room_id.as_bytes(), &bump_bytes]],
+                                &[&[
+                                    b"room".as_ref(),
+                                    ctx.accounts.room.host.as_ref(),
+                                    ctx.accounts.room.room_id.as_bytes(),
+                                    &bump_bytes,
+                                ]],
                             ),
                             prize_asset.amount,
                         )?;
 
-                        msg!("   Prize {}: Winner {} receives {} of token {}",
-                            prize_index + 1, winner, prize_asset.amount, prize_asset.mint);
+                        msg!(
+                            "   Prize {}: Winner {} receives {} of token {}",
+                            prize_index + 1,
+                            winner,
+                            prize_asset.amount,
+                            prize_asset.mint
+                        );
                     }
                 }
             }
@@ -327,9 +409,19 @@ pub fn handler<'info>(
     }
 
     msg!("Room ended and prizes distributed");
-    msg!("   Entry fees: {}, Extras: {} (100% to charity)", entry_fees_total, extras_total);
-    msg!("   Platform: {}, Host: {}, Charity: {}, Prizes: {}",
-        platform_fee, host_fee, charity_amount, prize_amount);
+    msg!(
+        "   Entry fees: {}, Extras: {}, Total pool: {}",
+        entry_fees_total,
+        extras_total,
+        total_pool
+    );
+    msg!(
+        "   Platform: {}, Host: {}, Charity: {}, Prizes: {}",
+        platform_fee,
+        host_fee,
+        charity_amount,
+        prize_amount
+    );
 
     // Emit event for off-chain indexers and frontend
     // OPTIMIZATION: Convert slice to Vec only when needed for event
@@ -345,6 +437,57 @@ pub fn handler<'info>(
     });
 
     Ok(())
+}
+
+/// Context for ending a room and distributing funds
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct EndRoom<'info> {
+    /// Room PDA account
+    #[account(
+        mut,
+        seeds = [b"room", host.key().as_ref(), room_id.as_bytes()],
+        bump = room.bump,
+    )]
+    pub room: Account<'info, Room>,
+
+    /// Room vault token account (source of funds)
+    #[account(mut)]
+    pub room_vault: Account<'info, anchor_spl::token::TokenAccount>,
+
+    /// Global configuration PDA
+    #[account(seeds = [b"global-config"], bump = global_config.bump)]
+    pub global_config: Account<'info, GlobalConfig>,
+
+    /// Platform wallet token account (receives platform fees)
+    /// Must be owned by GlobalConfig.platform_wallet
+    #[account(mut)]
+    pub platform_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+
+    /// Charity wallet token account (receives charity donations)
+    ///
+    /// IMPORTANT: This account is NOT validated against GlobalConfig.charity_wallet.
+    /// The frontend can pass ANY valid SPL TokenAccount, enabling support for:
+    /// - The Giving Block (TGB) dynamic wallet addresses (different address per transaction)
+    /// - Custom charity wallets per-room or per-transaction
+    /// - Per-room charity configuration
+    ///
+    /// Security: Anchor validates this is a valid TokenAccount, but the owner wallet
+    /// is not restricted. This provides flexibility for dynamic charity routing.
+    #[account(mut)]
+    pub charity_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+
+    /// Host wallet token account (receives host fees)
+    /// Must be owned by the room host
+    #[account(mut)]
+    pub host_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+
+    /// Host account ending the room
+    #[account(mut)]
+    pub host: Signer<'info>,
+
+    /// Token program for token transfers
+    pub token_program: Program<'info, anchor_spl::token::Token>,
 }
 
 // Note: EndRoom struct moved to lib.rs for Anchor macro compatibility

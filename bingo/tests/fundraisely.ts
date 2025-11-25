@@ -510,6 +510,8 @@ describe("fundraisely", () => {
 
   describe("End Room", () => {
     const roomId = "end-test-room";
+    const extrasTokens = [0, 20, 30]; // Optional extras added by each player (in whole tokens)
+    const extrasAmounts = extrasTokens.map((value) => new anchor.BN(value * 1_000_000));
     let roomPda: PublicKey;
     let roomVaultPda: PublicKey;
 
@@ -555,7 +557,7 @@ describe("fundraisely", () => {
       );
 
       await program.methods
-        .joinRoom(roomId, new anchor.BN(0))
+        .joinRoom(roomId, extrasAmounts[0])
         .accounts({
           room: roomPda,
           roomVault: roomVaultPda,
@@ -574,7 +576,7 @@ describe("fundraisely", () => {
       );
 
       await program.methods
-        .joinRoom(roomId, new anchor.BN(0))
+        .joinRoom(roomId, extrasAmounts[1])
         .accounts({
           room: roomPda,
           roomVault: roomVaultPda,
@@ -593,7 +595,7 @@ describe("fundraisely", () => {
       );
 
       await program.methods
-        .joinRoom(roomId, new anchor.BN(0))
+        .joinRoom(roomId, extrasAmounts[2])
         .accounts({
           room: roomPda,
           roomVault: roomVaultPda,
@@ -646,17 +648,21 @@ describe("fundraisely", () => {
       assert.equal(room.ended, true);
 
       // Verify fee distribution
-      // Total collected: 300 tokens (3 players * 100 tokens)
-      // Platform (20%): 60 tokens
-      // Host (4%): 12 tokens
-      // Prize pool (30%): 90 tokens
-      // Charity (46%): 138 tokens
+      // Total collected: 350 tokens (300 entry + 50 extras)
+      // Platform (20%): 70 tokens
+      // Host (4%): 14 tokens
+      // Prize pool (30%): 105 tokens
+      // Charity (46%): 161 tokens
 
-      const totalCollected = 300 * 1_000_000;
-      const expectedPlatform = (totalCollected * 2000) / 10000; // 60 tokens
-      const expectedHost = (totalCollected * 400) / 10000; // 12 tokens
-      const expectedPrizePool = (totalCollected * 3000) / 10000; // 90 tokens
-      const expectedCharity = totalCollected - expectedPlatform - expectedHost - expectedPrizePool; // 138 tokens
+      const extrasTotalTokens = extrasTokens.reduce((sum, value) => sum + value, 0);
+      const entryTokens = 3 * 100;
+      const totalCollectedTokens = entryTokens + extrasTotalTokens;
+      const totalCollected = totalCollectedTokens * 1_000_000;
+
+      const expectedPlatform = (totalCollected * 2000) / 10000; // 70 tokens
+      const expectedHost = (totalCollected * 400) / 10000; // 14 tokens
+      const expectedPrizePool = (totalCollected * 3000) / 10000; // 105 tokens
+      const expectedCharity = totalCollected - expectedPlatform - expectedHost - expectedPrizePool; // 161 tokens
 
       const finalPlatformBalance = (await getAccount(provider.connection, platformTokenAccount)).amount;
       const finalCharityBalance = (await getAccount(provider.connection, charityTokenAccount)).amount;
@@ -676,11 +682,13 @@ describe("fundraisely", () => {
       );
 
       // Verify prize distribution (60%, 30%, 10% of prize pool)
-      const expectedFirstPrize = (expectedPrizePool * 60) / 100; // 54 tokens
-      const expectedSecondPrize = (expectedPrizePool * 30) / 100; // 27 tokens
-      const expectedThirdPrize = (expectedPrizePool * 10) / 100; // 9 tokens
+      const expectedFirstPrize = (expectedPrizePool * 60) / 100; // 63 tokens
+      const expectedSecondPrize = (expectedPrizePool * 30) / 100; // 31 tokens (floor)
+      const expectedThirdPrize = (expectedPrizePool * 10) / 100; // 10 tokens (floor)
 
-      console.log("Total collected:", totalCollected / 1_000_000, "tokens");
+      console.log("Entry collected:", entryTokens, "tokens");
+      console.log("Extras collected:", extrasTotalTokens, "tokens");
+      console.log("Total collected:", totalCollectedTokens, "tokens");
       console.log("Platform fee:", expectedPlatform / 1_000_000, "tokens");
       console.log("Host fee:", expectedHost / 1_000_000, "tokens");
       console.log("Prize pool:", expectedPrizePool / 1_000_000, "tokens");

@@ -10,7 +10,6 @@
 //! - **room**: Room creation and management (init_pool_room, init_asset_room)
 //! - **player**: Player participation (join_room, ready_up, leave_room)
 //! - **game**: Game execution (declare_winners, end_room)
-//! - **utils**: Shared utility functions (BPS calculations, validation helpers)
 //!
 //! ## Design Philosophy
 //!
@@ -21,10 +20,7 @@
 //! - Mirrors frontend feature-based structure for consistency
 
 pub mod admin;
-pub mod room;
-pub mod player;
-pub mod game;
 pub mod asset;
-pub mod utils;
-
-// Context structs are now in lib.rs for Anchor macro compatibility
+pub mod game;
+pub mod player;
+pub mod room;

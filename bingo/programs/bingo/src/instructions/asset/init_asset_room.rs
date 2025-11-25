@@ -11,14 +11,14 @@
 //! - Host can take 0-5% of entry fees
 //! - Winners receive the pre-escrowed assets
 
-use anchor_lang::prelude::*;
-use crate::state::{RoomStatus, PrizeMode, PrizeAsset};
 use crate::errors::BingoError;
 use crate::events::AssetRoomCreated;
+use crate::state::{PrizeAsset, PrizeMode, RoomStatus};
+use anchor_lang::prelude::*;
 
 /// Create an asset-based room where prizes are pre-deposited tokens
 pub fn handler(
-    ctx: Context<crate::InitAssetRoom>,
+    ctx: Context<InitAssetRoom>,
     room_id: String,
     charity_wallet: Pubkey,
     entry_fee: u64,
@@ -94,7 +94,10 @@ pub fn handler(
         // SECURITY: Validate existing vault is a proper TokenAccount
         use anchor_spl::token::TokenAccount;
 
-        let vault_data = ctx.accounts.room_vault.try_borrow_data()
+        let vault_data = ctx
+            .accounts
+            .room_vault
+            .try_borrow_data()
             .map_err(|_| BingoError::InvalidVaultAccount)?;
 
         let vault_account = TokenAccount::try_deserialize(&mut vault_data.as_ref())
@@ -115,7 +118,9 @@ pub fn handler(
 
     // Validate token is approved in registry
     require!(
-        ctx.accounts.token_registry.is_token_approved(&ctx.accounts.fee_token_mint.key()),
+        ctx.accounts
+            .token_registry
+            .is_token_approved(&ctx.accounts.fee_token_mint.key()),
         BingoError::TokenNotApproved
     );
 
@@ -124,10 +129,7 @@ pub fn handler(
         BingoError::InvalidRoomId
     );
 
-    require!(
-        entry_fee > 0,
-        BingoError::InvalidEntryFee
-    );
+    require!(entry_fee > 0, BingoError::InvalidEntryFee);
 
     // Validate max_players
     const MAX_PLAYERS_LIMIT: u32 = 10000;
@@ -168,8 +170,12 @@ pub fn handler(
         .saturating_sub(host_fee_bps);
 
     // Asset-based rooms have higher charity allocation (75-80%)
-    msg!("   Platform: {}bps, Host: {}bps, Charity: {}bps",
-        platform_bps, host_fee_bps, room.charity_bps);
+    msg!(
+        "   Platform: {}bps, Host: {}bps, Charity: {}bps",
+        platform_bps,
+        host_fee_bps,
+        room.charity_bps
+    );
 
     room.prize_mode = PrizeMode::AssetBased;
     room.prize_distribution = vec![100, 0, 0]; // Not used for asset-based, but required
@@ -226,8 +232,12 @@ pub fn handler(
 
     // Count expected prizes
     let mut expected_prizes = 1u8; // prize_1 is mandatory
-    if prize_2_mint.is_some() { expected_prizes += 1; }
-    if prize_3_mint.is_some() { expected_prizes += 1; }
+    if prize_2_mint.is_some() {
+        expected_prizes += 1;
+    }
+    if prize_3_mint.is_some() {
+        expected_prizes += 1;
+    }
 
     // Emit event
     emit!(AssetRoomCreated {
@@ -242,4 +252,58 @@ pub fn handler(
     Ok(())
 }
 
-// Note: Account struct is in lib.rs
+/// Context for initializing asset-based room
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct InitAssetRoom<'info> {
+    /// Room PDA account
+    #[account(
+        init,
+        payer = host,
+        space = Room::LEN,
+        seeds = [b"room", host.key().as_ref(), room_id.as_bytes()],
+        bump
+    )]
+    pub room: Account<'info, Room>,
+
+    /// CHECK: Room vault PDA - must be writable for Token Program CPI during initialization.
+    /// SECURITY: PDA derivation validated via seeds constraint. Handler creates this account
+    /// with correct owner (Token Program) and authority (room PDA) via invoke_signed.
+    /// Using UncheckedAccount because account doesn't exist yet at instruction invocation time.
+    #[account(
+        mut,
+        seeds = [b"room-vault", room.key().as_ref()],
+        bump
+    )]
+    pub room_vault: UncheckedAccount<'info>,
+
+    /// Token mint for entry fees
+    pub fee_token_mint: Account<'info, anchor_spl::token::Mint>,
+
+    /// Token registry PDA
+    #[account(
+        seeds = [b"token-registry-v4"],
+        bump = token_registry.bump
+    )]
+    pub token_registry: Account<'info, TokenRegistry>,
+
+    /// Global configuration PDA
+    #[account(
+        seeds = [b"global-config"],
+        bump = global_config.bump
+    )]
+    pub global_config: Account<'info, GlobalConfig>,
+
+    /// Host account creating the room
+    #[account(mut)]
+    pub host: Signer<'info>,
+
+    /// System program for account creation
+    pub system_program: Program<'info, System>,
+
+    /// Token program for token operations
+    pub token_program: Program<'info, anchor_spl::token::Token>,
+
+    /// Rent sysvar for account sizing
+    pub rent: Sysvar<'info, Rent>,
+}

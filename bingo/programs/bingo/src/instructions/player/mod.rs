@@ -14,8 +14,9 @@
 //!
 //! - **leave_room**: Exit room before game starts (if allowed by host)
 //! - **ready_up**: Signal readiness to start game (for turn-based modes)
-//! - **add_extras**: Contribute additional charity donation after joining
+//! - **add_extras**: Contribute additional donation after joining
 
 pub mod join_room;
 
-// JoinRoom struct is now in lib.rs for Anchor macro compatibility
+// Re-export Account structs for use in lib.rs
+pub use join_room::JoinRoom;

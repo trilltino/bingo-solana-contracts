@@ -105,7 +105,7 @@ pub struct RoomEnded {
     /// Amount sent to host wallet
     pub host_amount: u64,
 
-    /// Amount sent to charity (includes all extras)
+    /// Amount sent to charity (remainder after platform/host/prize)
     pub charity_amount: u64,
 
     /// Total prize pool distributed to winners

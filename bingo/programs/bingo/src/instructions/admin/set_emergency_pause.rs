@@ -15,18 +15,15 @@
 //!   .rpc();
 //! ```
 
+use crate::{BingoError, EmergencyPauseToggled, GlobalConfig};
 use anchor_lang::prelude::*;
-use crate::{BingoError, EmergencyPauseToggled, SetEmergencyPause};
 
 pub fn handler(ctx: Context<SetEmergencyPause>, paused: bool) -> Result<()> {
     let global_config = &mut ctx.accounts.global_config;
     let admin = &ctx.accounts.admin;
 
     // Verify admin authority
-    require!(
-        global_config.admin == admin.key(),
-        BingoError::Unauthorized
-    );
+    require!(global_config.admin == admin.key(), BingoError::Unauthorized);
 
     // Update pause state
     global_config.emergency_pause = paused;
@@ -45,4 +42,20 @@ pub fn handler(ctx: Context<SetEmergencyPause>, paused: bool) -> Result<()> {
     );
 
     Ok(())
+}
+
+/// Context for setting emergency pause
+#[derive(Accounts)]
+pub struct SetEmergencyPause<'info> {
+    /// Global configuration PDA account
+    #[account(
+        mut,
+        seeds = [b"global-config"],
+        bump = global_config.bump
+    )]
+    pub global_config: Account<'info, GlobalConfig>,
+
+    /// Admin account setting the pause
+    #[account(mut)]
+    pub admin: Signer<'info>,
 }

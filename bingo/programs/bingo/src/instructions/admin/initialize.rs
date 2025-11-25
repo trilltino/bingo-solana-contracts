@@ -31,9 +31,9 @@
 //! 4. **Defines Economic Constraints**: Sets maximum/minimum fee percentages:
 //!    - platform_fee_bps: 2000 (20% fixed platform fee)
 //!    - max_host_fee_bps: 500 (5% maximum host can take)
-//!    - max_prize_pool_bps: 3500 (35% maximum for prizes)
+//!    - max_prize_pool_bps: 3500 (legacy field, not used for validation)
 //!    - min_charity_bps: 4000 (40% minimum must go to charity)
-//!    - Combined host + prizes cannot exceed 40%
+//!    - Prize validation: prize_pool_bps > 0 AND host_fee + prize_pool ≤ 40%
 //! 5. **Sets Emergency Controls**: Initializes emergency_pause flag to false
 //!
 //! ## Economic Model Enforcement
@@ -114,7 +114,7 @@ use anchor_lang::prelude::*;
 /// This must be called by the admin before any other operations.
 /// Sets up platform fees, wallets, and economic parameters.
 pub fn handler(
-    ctx: Context<crate::Initialize>,
+    ctx: Context<Initialize>,
     platform_wallet: Pubkey,
     charity_wallet: Pubkey,
 ) -> Result<()> {
@@ -124,10 +124,10 @@ pub fn handler(
     global_config.admin = ctx.accounts.admin.key();
     global_config.platform_wallet = platform_wallet;
     global_config.charity_wallet = charity_wallet;
-    global_config.platform_fee_bps = 2000;      // 20% platform fee
-    global_config.max_host_fee_bps = 500;       // 5% max host fee
-    global_config.max_prize_pool_bps = 3500;    // 35% max prize pool (40% - 5% host max)
-    global_config.min_charity_bps = 4000;       // 40% min charity
+    global_config.platform_fee_bps = 2000; // 20% platform fee
+    global_config.max_host_fee_bps = 500; // 5% max host fee
+    global_config.max_prize_pool_bps = 3500; // Legacy field (not used for validation)
+    global_config.min_charity_bps = 4000; // 40% min charity
     global_config.emergency_pause = false;
     global_config.bump = ctx.bumps.global_config;
 
@@ -139,4 +139,23 @@ pub fn handler(
     Ok(())
 }
 
-// Note: Initialize struct moved to lib.rs for Anchor macro compatibility
+/// Context for initializing the global configuration
+#[derive(Accounts)]
+pub struct Initialize<'info> {
+    /// Global configuration PDA account
+    #[account(
+        init,
+        payer = admin,
+        space = GlobalConfig::LEN,
+        seeds = [b"global-config"],
+        bump
+    )]
+    pub global_config: Account<'info, GlobalConfig>,
+
+    /// Admin account that will own the configuration
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    /// System program for account creation
+    pub system_program: Program<'info, System>,
+}

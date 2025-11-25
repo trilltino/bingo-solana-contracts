@@ -6,14 +6,14 @@
 //! This prevents situations where funds get locked if a host abandons a room before ending it.
 //! The instruction uses remaining_accounts to dynamically handle refunds to any number of players.
 
+use crate::events::RoomRecovered;
+use crate::{errors::BingoError, GlobalConfig, Room};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
-use crate::errors::BingoError;
-use crate::events::RoomRecovered;
 
 /// Recover an abandoned room - refund players
 pub fn handler<'info>(
-    ctx: Context<'_, '_, 'info, 'info, crate::RecoverRoom<'info>>,
+    ctx: Context<'_, '_, 'info, 'info, RecoverRoom<'info>>,
     _room_id: String,
 ) -> Result<()> {
     let room = &mut ctx.accounts.room;
@@ -51,11 +51,7 @@ pub fn handler<'info>(
 
     // Transfer platform fee
     let room_key = room.key();
-    let seeds = &[
-        b"room-vault",
-        room_key.as_ref(),
-        &[ctx.bumps.room_vault],
-    ];
+    let seeds = &[b"room-vault", room_key.as_ref(), &[ctx.bumps.room_vault]];
     let signer_seeds = &[&seeds[..]];
 
     let cpi_ctx = CpiContext::new_with_signer(
@@ -108,4 +104,43 @@ pub fn handler<'info>(
     });
 
     Ok(())
+}
+
+/// Context for recovering abandoned room
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct RecoverRoom<'info> {
+    /// Room PDA account
+    #[account(
+        mut,
+        seeds = [b"room", room.host.as_ref(), room_id.as_bytes()],
+        bump = room.bump
+    )]
+    pub room: Account<'info, Room>,
+
+    /// Room vault token account (source of refunds)
+    #[account(
+        mut,
+        seeds = [b"room-vault", room.key().as_ref()],
+        bump
+    )]
+    pub room_vault: Account<'info, anchor_spl::token::TokenAccount>,
+
+    /// Global configuration PDA
+    #[account(
+        seeds = [b"global-config"],
+        bump = global_config.bump
+    )]
+    pub global_config: Account<'info, GlobalConfig>,
+
+    /// Platform wallet token account (receives recovery fee)
+    #[account(mut)]
+    pub platform_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+
+    /// Admin account recovering the room
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    /// Token program for token transfers
+    pub token_program: Program<'info, anchor_spl::token::Token>,
 }

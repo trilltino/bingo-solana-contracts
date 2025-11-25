@@ -53,12 +53,12 @@
 //! ### Extras (Optional)
 //! ```text
 //! - Voluntary additional amount chosen by player (can be 0)
-//! - Goes 100% to charity (no splits)
-//! - Maximizes fundraising impact
-//! - Recorded in Room.total_extras_fees
+//! - Increases the total pool that will be split using the configured percentages
+//! - Maximizes fundraising impact for all beneficiaries
+//! - Recorded in Room.total_extras_fees for reporting purposes
 //! - Examples:
 //!   * extras_amount = 0: Pay exactly entry fee
-//!   * extras_amount = 5_000_000: Pay entry + 5 USDC extra to charity
+//!   * extras_amount = 5_000_000: Pay entry + 5 USDC extra into the shared pool
 //! ```
 //!
 //! ### Example Payment Flow
@@ -70,10 +70,9 @@
 //!
 //! Player B: joins with extras_amount = 10 USDC
 //!   - Pays: 20 USDC total (10 entry + 10 extras)
-//!   - Distribution:
-//!     From entry (10): Platform 2, Host 0.5, Prizes 3.5, Charity 4
-//!     From extras (10): Charity 10
-//!     Total to charity: 14 USDC (70% of Player B's payment!)
+//!   - Distribution (using same 20/5/35/40 split):
+//!     Platform 4, Host 1, Prizes 7, Charity 8
+//!     Charity still receives the remainder after fixed percentages
 //! ```
 //!
 //! ## State Transitions
@@ -241,14 +240,14 @@
 //!
 //! ```rust
 //! room.total_entry_fees += room.entry_fee;      // Subject to splits
-//! room.total_extras_fees += extras_amount;      // 100% to charity
+//! room.total_extras_fees += extras_amount;      // Tracked for analytics
 //! room.total_collected += total_payment;        // Grand total
 //! ```
 //!
 //! This separation enables:
 //! - Accurate distribution calculations in end_room
 //! - Transparent reporting of charitable impact
-//! - Verification that extras go 100% to charity
+//! - Verification that extras are tracked separately from mandatory entry fees
 //!
 //! ## Related Files
 //!
@@ -268,18 +267,14 @@
 //! - **Checked Arithmetic**: All additions use checked_add to prevent overflow
 //! - **Immutable Receipts**: PlayerEntry PDAs are permanent proof of participation
 
-use anchor_lang::prelude::*;
-use crate::state::RoomStatus;
 use crate::errors::BingoError;
 use crate::events::PlayerJoined;
-use crate::security::{EmergencyGuard, AmountValidator, ReentrancyGuard};
+use crate::state::RoomStatus;
+use crate::validation::{AmountValidator, EmergencyGuard, ReentrancyGuard};
+use anchor_lang::prelude::*;
 
 /// Join a room by paying entry fee
-pub fn handler(
-    ctx: Context<crate::JoinRoom>,
-    _room_id: String,
-    extras_amount: u64,
-) -> Result<()> {
+pub fn handler(ctx: Context<JoinRoom>, _room_id: String, extras_amount: u64) -> Result<()> {
     let room = &mut ctx.accounts.room;
     let current_slot = Clock::get()?.slot;
 
@@ -301,16 +296,10 @@ pub fn handler(
         BingoError::RoomNotReady
     );
 
-    require!(
-        !room.ended,
-        BingoError::RoomAlreadyEnded
-    );
+    require!(!room.ended, BingoError::RoomAlreadyEnded);
 
     // Check if joining is closed
-    require!(
-        !room.joining_closed,
-        BingoError::JoiningClosed
-    );
+    require!(!room.joining_closed, BingoError::JoiningClosed);
 
     // Check max players limit
     require!(
@@ -342,19 +331,23 @@ pub fn handler(
     player_entry.bump = ctx.bumps.player_entry;
 
     // Update room state
-    room.player_count = room.player_count
+    room.player_count = room
+        .player_count
         .checked_add(1)
         .ok_or(BingoError::ArithmeticOverflow)?;
 
-    room.total_collected = room.total_collected
+    room.total_collected = room
+        .total_collected
         .checked_add(total_payment)
         .ok_or(BingoError::ArithmeticOverflow)?;
 
-    room.total_entry_fees = room.total_entry_fees
+    room.total_entry_fees = room
+        .total_entry_fees
         .checked_add(room.entry_fee)
         .ok_or(BingoError::ArithmeticOverflow)?;
 
-    room.total_extras_fees = room.total_extras_fees
+    room.total_extras_fees = room
+        .total_extras_fees
         .checked_add(extras_amount)
         .ok_or(BingoError::ArithmeticOverflow)?;
 
@@ -381,4 +374,57 @@ pub fn handler(
     Ok(())
 }
 
-// Note: JoinRoom struct moved to lib.rs for Anchor macro compatibility
+/// Context for joining a room
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct JoinRoom<'info> {
+    /// Room PDA account
+    #[account(
+        mut,
+        seeds = [b"room", room.host.as_ref(), room_id.as_bytes()],
+        bump = room.bump
+    )]
+    pub room: Account<'info, Room>,
+
+    /// Player entry PDA - prevents duplicate joins
+    #[account(
+        init,
+        payer = player,
+        space = PlayerEntry::LEN,
+        seeds = [b"player", room.key().as_ref(), player.key().as_ref()],
+        bump
+    )]
+    pub player_entry: Account<'info, PlayerEntry>,
+
+    /// Room vault token account - receives player's entry fee tokens.
+    ///
+    /// # Security
+    /// Properly typed as TokenAccount to ensure correct account validation.
+    #[account(
+        mut,
+        seeds = [b"room-vault", room.key().as_ref()],
+        bump
+    )]
+    pub room_vault: Account<'info, anchor_spl::token::TokenAccount>,
+
+    /// Player's token account (source of funds)
+    #[account(mut)]
+    pub player_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+
+    /// Global configuration PDA
+    #[account(
+        seeds = [b"global-config"],
+        bump = global_config.bump
+    )]
+    pub global_config: Account<'info, GlobalConfig>,
+
+    /// Player account joining the room
+    #[account(mut)]
+    pub player: Signer<'info>,
+
+    /// Token program for token transfers
+    pub token_program: Program<'info, anchor_spl::token::Token>,
+
+    /// System program for account creation
+    pub system_program: Program<'info, System>,
+}

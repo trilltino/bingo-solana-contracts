@@ -51,7 +51,7 @@
 //!
 //! Each room defines its own fee structure within platform constraints:
 //!
-//! ### Fee Allocation (Entry Fees)
+//! ### Fee Allocation (Total Pool)
 //! ```text
 //! Platform Fee: 20% (fixed by GlobalConfig)
 //! Host Fee:     host_fee_bps (0-5%, host chooses)
@@ -59,19 +59,13 @@
 //! Charity:      charity_bps (calculated remainder, min 40%)
 //! ```
 //!
-//! ### Extras Allocation
-//! ```text
-//! All extras (beyond entry fee) go 100% to charity
-//! This maximizes fundraising impact and is transparent to all participants
-//! ```
-//!
 //! ### Distribution Calculation
 //! ```rust
-//! let platform_fee = total_entry_fees * 20 / 100;
-//! let host_fee = total_entry_fees * host_fee_bps / 10000;
-//! let prize_amount = total_entry_fees * prize_pool_bps / 10000;
-//! let charity_from_entry = total_entry_fees - platform_fee - host_fee - prize_amount;
-//! let total_charity = charity_from_entry + total_extras_fees;
+//! let total_pool = total_entry_fees + total_extras_fees;
+//! let platform_fee = total_pool * 20 / 100;
+//! let host_fee = total_pool * host_fee_bps / 10000;
+//! let prize_amount = total_pool * prize_pool_bps / 10000;
+//! let charity_amount = total_pool - platform_fee - host_fee - prize_amount;
 //! ```
 //!
 //! ## Prize Distribution
@@ -96,8 +90,8 @@
 //! Room maintains three critical counters for transparent accounting:
 //!
 //! - **total_collected**: Sum of all funds received
-//! - **total_entry_fees**: Sum of entry fees only (subject to percentage splits)
-//! - **total_extras_fees**: Sum of extras only (100% to charity)
+//! - **total_entry_fees**: Sum of required entry fees (used for analytics)
+//! - **total_extras_fees**: Sum of optional extras (tracked separately for reporting)
 //!
 //! These enable:
 //! - On-chain audit trails
@@ -233,7 +227,7 @@ pub struct Room {
     pub host: Pubkey,
 
     /// Charity wallet address (per-room, from The Giving Block or custom)
-    /// Receives the charity portion of entry fees + 100% of extras
+    /// Receives the charity portion (remainder) of the total pool
     pub charity_wallet: Pubkey,
 
     /// Token mint for entry fees

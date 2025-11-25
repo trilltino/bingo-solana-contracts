@@ -41,9 +41,9 @@
 //!
 //! ### Extras (extras_paid)
 //! - Optional additional payment beyond entry fee
-//! - Goes 100% to charity (no splits)
+//! - Added to the shared pool and split using the same percentages
 //! - Amount chosen by player (can be 0)
-//! - Maximizes fundraising impact
+//! - Maximizes fundraising impact for every stakeholder
 //!
 //! ### Total Payment (total_paid)
 //! - Sum of entry_paid + extras_paid
@@ -60,17 +60,12 @@
 //!   extras_paid = 5 USDC
 //!   total_paid = 15 USDC
 //!
-//! Distribution:
-//!   From entry_paid (10 USDC):
-//!     Platform: 2 USDC (20%)
-//!     Host: 0.5 USDC (5%)
-//!     Prize: 3.5 USDC (35%)
-//!     Charity: 4 USDC (40%)
-//!
-//!   From extras_paid (5 USDC):
-//!     Charity: 5 USDC (100%)
-//!
-//!   Total to charity: 9 USDC (60% of total payment)
+//! Distribution (assuming 20/5/35/40 split):
+//!   Total pool: 15 USDC
+//!     Platform: 3 USDC (20%)
+//!     Host: 0.75 USDC (5%)
+//!     Prize: 5.25 USDC (35%)
+//!     Charity: 6 USDC (40%)
 //! ```
 //!
 //! ## Lifecycle

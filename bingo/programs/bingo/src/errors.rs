@@ -52,7 +52,8 @@
 //!
 //! ### Economic Model Errors
 //! - `HostFeeTooHigh`: Enforces 5% maximum host fee
-//! - `PrizePoolTooHigh`: Enforces 35% maximum prize pool
+//! - `PrizePoolTooLow`: Ensures prize pool is greater than 0
+//! - `PrizePoolTooHigh`: Enforces host + prize ≤ 40%
 //! - `CharityBelowMinimum`: Enforces 40% minimum charity allocation
 //! - `InvalidPrizeDistribution`: Ensures prize percentages sum to exactly 100%
 //!
@@ -73,7 +74,7 @@
 //!
 //! - Charity allocation cannot fall below 40% of entry fees (CharityBelowMinimum)
 //! - Host fees cannot exceed 5% (HostFeeTooHigh)
-//! - Prize pools cannot exceed 35% (PrizePoolTooHigh)
+//! - Prize pools must be > 0 and host + prizes ≤ 40% (PrizePoolTooLow, PrizePoolTooHigh)
 //! - Combined allocations must not exceed 100% (TotalAllocationTooHigh)
 //!
 //! These constraints are enforced at room creation and cannot be bypassed, ensuring transparent
@@ -128,8 +129,11 @@ pub enum BingoError {
     #[msg("Host fee exceeds maximum (5%)")]
     HostFeeTooHigh,
 
-    #[msg("Prize pool exceeds maximum (35%)")]
+    #[msg("Prize pool exceeds maximum (40% minus host fee)")]
     PrizePoolTooHigh,
+
+    #[msg("Prize pool must be greater than 0")]
+    PrizePoolTooLow,
 
     #[msg("Charity allocation below minimum (40%)")]
     CharityBelowMinimum,
